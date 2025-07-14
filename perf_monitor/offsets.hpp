@@ -37,7 +37,39 @@ enum class Offsets : std::uint32_t {
     GetClientConnection = 0X005AB490,
     GetNetStats = 0X00537F20,
 
+    IEvtQueueDispatch = 0x004245b0,
+
     SpellVisualsInitialize = 0x006ec0e0,
 
+    RenderWorld = 0x00482d70, // calls everything
+
+    OnWorldUpdate = 0x00482ea0,
+    CWorldUpdate = 0x0066FD50,
+    CGWorldFrameUnitUpdate = 0x00482CA0,
+
     OnWorldRender = 0x00483460,
+    CWorldSceneRender = 0x00681070,
+    CWorldRender = 0x006701E0,
+    SpellVisualsRender = 0X006ECB20,
+    SpellVisualsTick = 0x006eca20,
+    CWorldUnknownRender = 0X0069A3E0,
+
+    CSimpleTopOnLayerUpdate = 0X00765650,
+    CSimpleTopOnLayerRender = 0X007657D0,
+
+    CSimpleFrameOnFrameRender1 = 0X0076B3A0,
+    CSimpleFrameOnFrameRender2 = 0X0076B3F0,
+    CSimpleModelOnFrameRender = 0X0076D160,
+
+    FrameScript_Execute = 0X007026F0,
+
+    CSimpleFrameOnLayerUpdate = 0x0076B2C0,
+
+    FrameScriptObjectOnScriptEvent = 0X00704D50,
+    FrameScriptObjectOnScriptEventParam = 0x00702710,
+
+    SignalEvent = 0X00703E50,
+    SignalEventParam = 0X00703F50,
+
+    RunningAddonName = 0X00CEEAC0,
 };

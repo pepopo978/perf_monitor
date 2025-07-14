@@ -33,6 +33,12 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 
 find_package(Boost REQUIRED COMPONENTS filesystem program_options)
 
+# Microsoft Detours configuration
+set(DETOURS_ROOT "${CMAKE_SOURCE_DIR}/perf_monitor")
+if(NOT EXISTS "${DETOURS_ROOT}/detours.h")
+    message(FATAL_ERROR "Detours not found in workspace! Expected detours.h in ${DETOURS_ROOT}")
+endif()
+
 if (Boost_FOUND)
     message(STATUS "boost found at ${Boost_INCLUDE_DIR}.  Library dir: ${Boost_LIBRARY_DIR_DEBUG}")
 else()
@@ -85,9 +91,10 @@ include_directories(
         "${HADESMEM_ROOT}/include/memory/"
         "${HADESMEM_ROOT}/deps/udis86/udis86"
         "${HADESMEM_ROOT}/deps/asmjit/asmjit/src"
+        "${DETOURS_ROOT}"
 )
 
-link_directories("${HADESMEM_LIB_DIR}")
+link_directories("${HADESMEM_LIB_DIR}" "${DETOURS_ROOT}")
 
 # Set static runtime library
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
