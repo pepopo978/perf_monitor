@@ -1,9 +1,21 @@
+# Overview
 Tool to monitor performance stats in 30 second intervals for core game functions as well as addons.
 
 From the timings I've observed it seems like the client game logic each frame is kicked off by CSimpleTop(UIParent I think) OnRender and OnUpdate functions.  It's really hard to follow the exact call flow with how abstracted everything is so this could be wrong, but my `[Total] Render` is based on UIParent render.  If you're wondering why total render time is a lot less than the 30 second measuring window I'm not entirely sure, some of that time is spent idling I assuming waiting for networking updates or gpu renders to finish.
 
 If any of these assumptions I've made are wrong or you find better ways to measure things please let me know or make a pull request :)
 
+# Installation
+Grab the latest perf_monitor.dll from https://github.com/pepopo978/perf_monitor/releases and place in the same directory as WoW.exe and then add to dlls.txt.
+
+If you would prefer to compile yourself you will need to get:
+
+boost 1.80 32 bit from https://www.boost.org/users/history/version_1_80_0.html
+hadesmem from https://github.com/namreeb/hadesmem
+CMakeLists.txt is currently looking for boost at set(BOOST_INCLUDEDIR "C:/software/boost_1_80_0") and hadesmem at set(HADESMEM_ROOT "C:/software/hadesmem-v142-Debug-Win32"). Edit as needed.
+
+
+# Example
 Here's some example output fighting sapphiron with 40 bots:
 
 ```
