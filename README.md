@@ -6,6 +6,7 @@ If any of these assumptions I've made are wrong or you find better ways to measu
 
 Here's some example output fighting sapphiron with 40 bots:
 
+```
 07-13 17:15:59: --------------------------------------------------------------------------------------------------------------------------------------
 07-13 17:15:59: --- STATS from 22:25:00 to 22:25:30 ---
 07-13 17:15:59: [Total] Render: 23116.71 ms.  Avg fps:  61.30
@@ -227,3 +228,4 @@ Here's some example output fighting sapphiron with 40 bots:
 07-13 17:15:59: [CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_BUFFS ] Calls:      196, Total:   40.409 ms, Avg:  0.206 ms, Slowest:   0.309 ms, Fastest:  0.082 ms
 07-13 17:15:59: [CHAT_MSG_SPELL_CREATURE_VS_CREATURE_DAMAGE   ] Calls:      133, Total:   36.900 ms, Avg:  0.277 ms, Slowest:   1.015 ms, Fastest:  0.134 ms
 07-13 17:15:59: --------------------------------------------------------------------------------------------------------------------------------------
+```
