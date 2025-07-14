@@ -1089,6 +1089,12 @@ namespace perf_monitor {
         gStartTime = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now().time_since_epoch()).count());
 
+        // remove/rename previous logs
+        remove("perf_monitor.log.3");
+        rename("perf_monitor.log.2", "perf_monitor.log.3");
+        rename("perf_monitor.log.1", "perf_monitor.log.2");
+        rename("perf_monitor.log", "perf_monitor.log.1");
+
         // open new log file
         debugLogFile.open("perf_monitor.log");
 
