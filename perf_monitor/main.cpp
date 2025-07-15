@@ -77,6 +77,8 @@ namespace perf_monitor {
     FunctionStats gCSimpleModelOnFrameRenderStats("CSimpleModelOnFrameRender");
     FunctionStats gCSimpleTopOnLayerUpdateStats("UIParent OnUpdate");
     FunctionStats gCSimpleTopOnLayerRenderStats("UIParent OnRender");
+    FunctionStats gObjectUpdateHandlerStats("ObjectUpdateHandler");
+    FunctionStats gPlaySpellVisualStats("PlaySpellVisual");
 
 
     // Track 5 slowest events for each addon
@@ -84,6 +86,9 @@ namespace perf_monitor {
 
     // Track addon OnUpdate performance
     std::map<std::string, FunctionStats> gAddonOnUpdateStats;
+
+    // Track spell visual performance by spell ID
+    std::map<uint32_t, FunctionStats> gSpellVisualStatsById;
 
     // Early alphabetical Ace addons that are likely to get associated with other addons events
     std::set<std::string> gAceAddonBlacklist = {
@@ -117,17 +122,6 @@ namespace perf_monitor {
         return p_GetContext();
     }
 
-    std::string format_timestamp_ms(uint64_t ms_since_epoch) {
-        auto const time_point = std::chrono::time_point<std::chrono::system_clock>(
-                std::chrono::milliseconds(ms_since_epoch));
-        auto const time_t_val = std::chrono::system_clock::to_time_t(time_point);
-        std::tm tm_val;
-        localtime_s(&tm_val, &time_t_val);
-
-        std::stringstream ss;
-        ss << std::put_time(&tm_val, "%H:%M:%S");
-        return ss.str();
-    }
 
     // Helper function to track slowest events for an addon
     std::string getAddonOrFrameName(uintptr_t *framescriptObj, uintptr_t *addonNamePtr) {
@@ -143,11 +137,12 @@ namespace perf_monitor {
         }
 
         // Try to get frame name
-        if (framescriptObj != nullptr && IsBadReadPtr(framescriptObj, sizeof(uintptr_t) * 39) == 0 && framescriptObj[38] != 0) {
+        if (framescriptObj != nullptr && IsBadReadPtr(framescriptObj, sizeof(uintptr_t) * 39) == 0 &&
+            framescriptObj[38] != 0) {
             auto frameName = reinterpret_cast<char *>(framescriptObj[38]);
             if (frameName != nullptr && IsValidAsciiString(frameName)) {
                 frameNameStr = std::string(frameName);
-                
+
                 // Ignore frame names ending with .dll
                 if (frameNameStr.length() >= 4 && frameNameStr.substr(frameNameStr.length() - 4) == ".dll") {
                     frameNameStr = "";
@@ -158,17 +153,21 @@ namespace perf_monitor {
                     frameNameStr = "Cursive";
                 } else if (frameNameStr.length() >= 7 && frameNameStr.substr(0, 7) == "BigWigs") {
                     frameNameStr = "BigWigs";
-                } else if ((frameNameStr.length() >= 4 && frameNameStr.substr(0, 4) == "MSBT") || (frameNameStr.length() >= 4 && frameNameStr.substr(0, 4) == "MCEH")) {
+                } else if ((frameNameStr.length() >= 4 && frameNameStr.substr(0, 4) == "MSBT") ||
+                           (frameNameStr.length() >= 4 && frameNameStr.substr(0, 4) == "MCEH")) {
                     frameNameStr = "MSBT";
-                } else if (frameNameStr.length() >= 13 && frameNameStr.substr(0, 9) == "Character" && frameNameStr.substr(frameNameStr.length() - 4) == "Slot") {
+                } else if (frameNameStr.length() >= 13 && frameNameStr.substr(0, 9) == "Character" &&
+                           frameNameStr.substr(frameNameStr.length() - 4) == "Slot") {
                     frameNameStr = "CharacterSlot";
-                } else if (frameNameStr.length() >= 11 && frameNameStr.substr(0, 7) == "Inspect" && frameNameStr.substr(frameNameStr.length() - 4) == "Slot") {
+                } else if (frameNameStr.length() >= 11 && frameNameStr.substr(0, 7) == "Inspect" &&
+                           frameNameStr.substr(frameNameStr.length() - 4) == "Slot") {
                     frameNameStr = "InspectSlot";
                 } else if (frameNameStr.length() >= 8 && frameNameStr.substr(0, 8) == "RABFrame") {
                     frameNameStr = "Rabuffs";
                 } else {
                     // Strip numbers from frame name
-                    frameNameStr.erase(std::remove_if(frameNameStr.begin(), frameNameStr.end(), ::isdigit), frameNameStr.end());
+                    frameNameStr.erase(std::remove_if(frameNameStr.begin(), frameNameStr.end(), ::isdigit),
+                                       frameNameStr.end());
                 }
             }
         }
@@ -217,6 +216,8 @@ namespace perf_monitor {
         double totalSpellVisualsRender = gSpellVisualsRenderStats.totalTime;
         double totalSpellVisualsTick = gSpellVisualsTickStats.totalTime;
         double totalUnitUpdate = gUnitUpdateStats.totalTime;
+        double totalObjectUpdateHandler = gObjectUpdateHandlerStats.totalTime;
+        double totalPlaySpellVisual = gPlaySpellVisualStats.totalTime;
         double totalFrameOnLayerUpdate = gFrameOnLayerUpdateStats.totalTime;
         double totalCWorldRender = gCWorldRenderStats.totalTime;
         double totalCWorldUpdate = gCWorldUpdateStats.totalTime;
@@ -246,6 +247,10 @@ namespace perf_monitor {
                                                                             : 0.0;
         double unitUpdatePercent = (totalCSimpleTopOnLayerRender > 0) ?
                                    (totalUnitUpdate / totalCSimpleTopOnLayerRender) * 100.0 : 0.0;
+        double objectUpdateHandlerPercent = (totalCSimpleTopOnLayerRender > 0) ?
+                                            (totalObjectUpdateHandler / totalCSimpleTopOnLayerRender) * 100.0 : 0.0;
+        double playSpellVisualPercent = (totalCSimpleTopOnLayerRender > 0) ?
+                                       (totalPlaySpellVisual / totalCSimpleTopOnLayerRender) * 100.0 : 0.0;
         double frameOnLayerUpdatePercent = (totalCSimpleTopOnLayerRender > 0) ?
                                            (totalFrameOnLayerUpdate / totalCSimpleTopOnLayerRender) * 100.0
                                                                               : 0.0;
@@ -277,6 +282,8 @@ namespace perf_monitor {
         double totalSpellVisualsRenderMs = totalSpellVisualsRender / 1000.0;
         double totalSpellVisualsTickMs = totalSpellVisualsTick / 1000.0;
         double totalUnitUpdateMs = totalUnitUpdate / 1000.0;
+        double totalObjectUpdateHandlerMs = totalObjectUpdateHandler / 1000.0;
+        double totalPlaySpellVisualMs = totalPlaySpellVisual / 1000.0;
         double totalFrameOnLayerUpdateMs = totalFrameOnLayerUpdate / 1000.0;
         double totalFrameOnScriptEventMs = totalFrameOnScriptEvent / 1000.0;
         double totalEvtPaintMs = totalEvtPaint / 1000.0;
@@ -290,11 +297,34 @@ namespace perf_monitor {
         // --- SUMMARY ---
         DEBUG_LOG(
                 "--------------------------------------------------------------------------------------------------------------------------------------");
-        DEBUG_LOG("--- STATS from " << format_timestamp_ms(startTime) << " to " << format_timestamp_ms(endTime)
-                                    << " ---");
+        // Calculate start time by subtracting 30 seconds from current time
+        auto now = std::chrono::system_clock::now();
+        auto thirtySecondsAgo = now - std::chrono::seconds(30);
+        std::time_t start_time_t = std::chrono::system_clock::to_time_t(thirtySecondsAgo);
+        std::time_t end_time_t = std::chrono::system_clock::to_time_t(now);
+        
+        std::tm start_tm, end_tm;
+    #ifdef _WIN32
+        localtime_s(&start_tm, &start_time_t);
+        localtime_s(&end_tm, &end_time_t);
+    #else
+        localtime_r(&start_time_t, &start_tm);
+        localtime_r(&end_time_t, &end_tm);
+    #endif
+        
+        std::ostringstream start_oss, end_oss;
+        start_oss << std::put_time(&start_tm, "%m-%d %H:%M:%S");
+        end_oss << std::put_time(&end_tm, "%m-%d %H:%M:%S");
+        
+        DEBUG_LOG("--- STATS from " << start_oss.str() << " to " << end_oss.str() << " ---");
         DEBUG_LOG(
                 std::fixed << std::setprecision(2)
                            << "[Total] Render: " << std::right << std::setw(8) << totalCSimpleTopOnLayerRenderMs
+                           << " ms.  Frames: " << std::right << std::setw(6) << gCSimpleTopOnLayerRenderStats.callCount
+                           << ".  Time per frame: " << std::right << std::setw(6)
+                           << (gCSimpleTopOnLayerRenderStats.callCount > 0 ? totalCSimpleTopOnLayerRenderMs /
+                                                                             gCSimpleTopOnLayerRenderStats.callCount
+                                                                           : 0.0)
                            << " ms.  Avg fps: "
                            << std::right << std::setw(6)
                            << (callCount > 0 ? callCount / (STATS_OUTPUT_INTERVAL_MS / 1000.0) : 0.0));
@@ -359,6 +389,18 @@ namespace perf_monitor {
                << std::right << std::setw(6) << unitUpdatePercent << "% ("
                << std::right << std::setw(8) << totalUnitUpdateMs << " ms)";
             allStats.emplace_back(unitUpdatePercent, ss.str());
+
+            ss.str("");
+            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "ObjectUpdateHandler:"
+               << std::right << std::setw(6) << objectUpdateHandlerPercent << "% ("
+               << std::right << std::setw(8) << totalObjectUpdateHandlerMs << " ms)";
+            allStats.emplace_back(objectUpdateHandlerPercent, ss.str());
+
+            ss.str("");
+            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "PlaySpellVisual:"
+               << std::right << std::setw(6) << playSpellVisualPercent << "% ("
+               << std::right << std::setw(8) << totalPlaySpellVisualMs << " ms)";
+            allStats.emplace_back(playSpellVisualPercent, ss.str());
 
             // Frame stats
             ss.str("");
@@ -435,6 +477,8 @@ namespace perf_monitor {
 //        gSpellVisualsRenderStats.outputStats();
 //        gSpellVisualsTickStats.outputStats();
         gUnitUpdateStats.outputStats();
+        gObjectUpdateHandlerStats.outputStats();
+        gPlaySpellVisualStats.outputStats();
 
         gFrameOnScriptEventStats.outputStats();
         gFrameOnLayerUpdateStats.outputStats();
@@ -492,7 +536,7 @@ namespace perf_monitor {
                 if (!slowEvents.empty()) {
                     // Calculate total duration for this addon
                     double totalAddonDuration = 0.0;
-                    for (const auto &event : slowEvents) {
+                    for (const auto &event: slowEvents) {
                         totalAddonDuration += event.duration;
                     }
 
@@ -519,6 +563,26 @@ namespace perf_monitor {
                                        << "      Count: " << std::right << std::setw(6) << event.count);
                     }
                 }
+            }
+        }
+
+        // --- SPELL VISUAL PERFORMANCE (TOP 10 SLOWEST) ---
+        if (!gSpellVisualStatsById.empty()) {
+            DEBUG_LOG("--- SPELL VISUAL PERFORMANCE (min .1ms total) ---");
+
+            // Sort spells by total time
+            std::vector<std::pair<double, uint32_t>> spellStats;
+            for (auto it = gSpellVisualStatsById.begin(); it != gSpellVisualStatsById.end(); ++it) {
+                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
+                    spellStats.push_back(std::make_pair(it->second.totalTime, it->first));
+                }
+            }
+            std::sort(spellStats.rbegin(), spellStats.rend());
+
+            // Show only top 10 spells
+            size_t spellsToShow = spellStats.size() < 10 ? spellStats.size() : 10;
+            for (size_t i = 0; i < spellsToShow; ++i) {
+                gSpellVisualStatsById[spellStats[i].second].outputStats(20);
             }
         }
 
@@ -560,6 +624,8 @@ namespace perf_monitor {
         gSpellVisualsRenderStats.clearStats();
         gSpellVisualsTickStats.clearStats();
         gUnitUpdateStats.clearStats();
+        gObjectUpdateHandlerStats.clearStats();
+        gPlaySpellVisualStats.clearStats();
         gFrameOnLayerUpdateStats.clearStats();
 
         // Clear addon stats
@@ -576,6 +642,11 @@ namespace perf_monitor {
 
         // Clear addon event stats
         gAddonEventStats.clear();
+
+        // Clear spell visual stats
+        for (auto it = gSpellVisualStatsById.begin(); it != gSpellVisualStatsById.end(); ++it) {
+            it->second.clearStats();
+        }
 
         // Clear event code stats
         for (auto it = gEventCodeStats.begin(); it != gEventCodeStats.end(); ++it) {
@@ -639,7 +710,9 @@ namespace perf_monitor {
 
         // Only output stats in the RenderWorldHook (once per minute)
         if (gRenderWorldStats.checkAndOutputStats(nowMs)) {
-            OutputStats(gRenderWorldStats.periodStartTime, nowMs);
+            uint64_t previousPeriodStart = gRenderWorldStats.periodStartTime;
+            uint64_t previousPeriodEnd = nowMs;
+            OutputStats(previousPeriodStart, previousPeriodEnd);
             gRenderWorldStats.periodStartTime = nowMs;
         }
     }
@@ -765,6 +838,61 @@ namespace perf_monitor {
 
         // Update stats without outputting
         gUnitUpdateStats.update(duration);
+    }
+
+    typedef enum OBJECT_TYPE_ID {
+        ID_OBJECT=0,
+        ID_ITEM=1,
+        ID_CONTAINER=2,
+        ID_UNIT=3,
+        ID_PLAYER=4,
+        ID_GAMEOBJECT=5,
+        ID_DYNAMICOBJECT=6,
+        ID_CORPSE=7,
+        ID_AIGROUP=8,
+        NUM_CLIENT_OBJECT_TYPES=8,
+        ID_AREATRIGGER=9,
+        NUM_OBJECT_TYPES=10
+    } OBJECT_TYPE_ID;
+
+    // ObjectUpdateHandler hook
+    int ObjectUpdateHandlerHook(hadesmem::PatchDetourBase *detour, uintptr_t *param_1, CDataStore *dataStore) {
+        auto const ObjectUpdateHandler = detour->GetTrampolineT<PacketHandlerT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        auto result = ObjectUpdateHandler(param_1, dataStore);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Update stats without outputting
+        gObjectUpdateHandlerStats.update(duration);
+
+        return result;
+    }
+
+    // PlaySpellVisual hook
+    void PlaySpellVisualHook(hadesmem::PatchDetourBase *detour, uintptr_t *unit, uintptr_t *unk, uintptr_t *spellRec, uintptr_t *visualKit, void *param_3, void *param_4) {
+        auto const PlaySpellVisual = detour->GetTrampolineT<PlaySpellVisualT>();
+        auto start = std::chrono::high_resolution_clock::now();
+
+        auto spellId = spellRec ? spellRec[0] : 0;
+
+        PlaySpellVisual( unit, unk, spellRec, visualKit, param_3, param_4);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Update overall stats
+        gPlaySpellVisualStats.update(duration);
+
+        // Update spell-specific stats
+        if (spellId != 0) {
+            if (gSpellVisualStatsById.find(spellId) == gSpellVisualStatsById.end()) {
+                std::string spellName = "Spell ID " + std::to_string(spellId);
+                gSpellVisualStatsById[spellId] = FunctionStats(spellName);
+            }
+            gSpellVisualStatsById[spellId].update(duration);
+        }
     }
 
     // Add these new hook functions
@@ -1140,8 +1268,14 @@ namespace perf_monitor {
         // Hook SpellVisualsTick
         initializeHook<StdcallT>(process, Offsets::SpellVisualsTick, &SpellVisualsTickHook);
 
+        // Hook PlaySpellVisual - DISABLED
+        // initializeHook<PlaySpellVisualT>(process, Offsets::PlaySpellVisual, &PlaySpellVisualHook);
+
         // Hook UnitUpdate
         initializeHook<FastcallFrameT>(process, Offsets::CGWorldFrameUnitUpdate, &UnitUpdateHook);
+
+        // Hook ObjectUpdateHandler
+        initializeHook<PacketHandlerT>(process, Offsets::ObjectUpdateHandler, &ObjectUpdateHandlerHook);
 
         // Hook FrameOnLayerUpdate
         initializeHook<FrameOnLayerUpdateT>(process, Offsets::CSimpleFrameOnLayerUpdate, &FrameOnLayerUpdateHook);

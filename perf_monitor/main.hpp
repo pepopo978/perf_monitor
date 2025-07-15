@@ -20,6 +20,7 @@
 #include <iostream>
 #include <fstream>
 #include "events.hpp"
+#include "cdatastore.hpp"
 
 namespace perf_monitor {
 
@@ -70,10 +71,11 @@ namespace perf_monitor {
     using lua_errorT = void (__cdecl *)(uintptr_t *, const char *);
     using lua_settopT = void (__fastcall *)(uintptr_t *, int);
 
-
     using SpellVisualsInitializeT = void (__stdcall *)(void);
 
-    using PlaySpellVisual = void (__stdcall *)(int **param_1, void *param_2, int param_3, void **param_4);
+    using PlaySpellVisualT = void (__fastcall *)(uintptr_t *unit, uintptr_t *unk, uintptr_t *spellRec, uintptr_t *visualKit, void *param_3, void *param_4);
+
+    using PacketHandlerT = int (__stdcall *)(uintptr_t *param_1, CDataStore *dataStore);
 
     inline bool IsValidAsciiString(const char* str, size_t maxLen = 256) {
         if (!str) return false;

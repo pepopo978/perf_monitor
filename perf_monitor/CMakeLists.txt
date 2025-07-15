@@ -8,6 +8,8 @@ include_directories(
 )
 
 set(SOURCE_FILES
+        cdatastore.hpp
+        cdatastore.cpp
         logging.hpp
         logging.cpp
         main.hpp

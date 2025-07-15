@@ -37,13 +37,13 @@ enum class Offsets : std::uint32_t {
     GetClientConnection = 0X005AB490,
     GetNetStats = 0X00537F20,
 
-    IEvtQueueDispatch = 0x004245b0,
+    IEvtQueueDispatch = 0X004245B0,
 
-    SpellVisualsInitialize = 0x006ec0e0,
+    SpellVisualsInitialize = 0X006EC0E0,
 
-    RenderWorld = 0x00482d70, // calls everything
+    RenderWorld = 0X00482D70,
 
-    OnWorldUpdate = 0x00482ea0,
+    OnWorldUpdate = 0X00482EA0,
     CWorldUpdate = 0x0066FD50,
     CGWorldFrameUnitUpdate = 0x00482CA0,
 
@@ -51,8 +51,11 @@ enum class Offsets : std::uint32_t {
     CWorldSceneRender = 0x00681070,
     CWorldRender = 0x006701E0,
     SpellVisualsRender = 0X006ECB20,
-    SpellVisualsTick = 0x006eca20,
+    SpellVisualsTick = 0X006ECA20,
+    PlaySpellVisual = 0X0060EDF0,
     CWorldUnknownRender = 0X0069A3E0,
+
+    ObjectUpdateHandler = 0x004651a0,
 
     CSimpleTopOnLayerUpdate = 0X00765650,
     CSimpleTopOnLayerRender = 0X007657D0,
