@@ -75,6 +75,9 @@ namespace perf_monitor {
 
     using PlaySpellVisualT = void (__fastcall *)(uintptr_t *unit, uintptr_t *unk, uintptr_t *spellRec, uintptr_t *visualKit, void *param_3, void *param_4);
 
+    using UnknownOnRender1T = int (__fastcall *)(void *this_ptr, void *dummy_edx, float *param_1);
+
+
     using PacketHandlerT = int (__stdcall *)(uintptr_t *param_1, CDataStore *dataStore);
 
     inline bool IsValidAsciiString(const char* str, size_t maxLen = 256) {

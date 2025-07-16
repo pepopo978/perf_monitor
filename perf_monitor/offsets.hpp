@@ -54,6 +54,7 @@ enum class Offsets : std::uint32_t {
     SpellVisualsTick = 0X006ECA20,
     PlaySpellVisual = 0X0060EDF0,
     CWorldUnknownRender = 0X0069A3E0,
+    UnknownOnRender1 = 0x00707680,
 
     ObjectUpdateHandler = 0x004651a0,
 

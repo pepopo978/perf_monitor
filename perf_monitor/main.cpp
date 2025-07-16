@@ -79,6 +79,7 @@ namespace perf_monitor {
     FunctionStats gCSimpleTopOnLayerRenderStats("UIParent OnRender");
     FunctionStats gObjectUpdateHandlerStats("ObjectUpdateHandler");
     FunctionStats gPlaySpellVisualStats("PlaySpellVisual");
+    FunctionStats gUnknownOnRender1Stats("UnknownOnRender1");
 
 
     // Track 5 slowest events for each addon
@@ -218,6 +219,7 @@ namespace perf_monitor {
         double totalUnitUpdate = gUnitUpdateStats.totalTime;
         double totalObjectUpdateHandler = gObjectUpdateHandlerStats.totalTime;
         double totalPlaySpellVisual = gPlaySpellVisualStats.totalTime;
+        double totalUnknownOnRender1 = gUnknownOnRender1Stats.totalTime;
         double totalFrameOnLayerUpdate = gFrameOnLayerUpdateStats.totalTime;
         double totalCWorldRender = gCWorldRenderStats.totalTime;
         double totalCWorldUpdate = gCWorldUpdateStats.totalTime;
@@ -251,6 +253,8 @@ namespace perf_monitor {
                                             (totalObjectUpdateHandler / totalCSimpleTopOnLayerRender) * 100.0 : 0.0;
         double playSpellVisualPercent = (totalCSimpleTopOnLayerRender > 0) ?
                                        (totalPlaySpellVisual / totalCSimpleTopOnLayerRender) * 100.0 : 0.0;
+        double unknownOnRender1Percent = (totalCSimpleTopOnLayerRender > 0) ?
+                                        (totalUnknownOnRender1 / totalCSimpleTopOnLayerRender) * 100.0 : 0.0;
         double frameOnLayerUpdatePercent = (totalCSimpleTopOnLayerRender > 0) ?
                                            (totalFrameOnLayerUpdate / totalCSimpleTopOnLayerRender) * 100.0
                                                                               : 0.0;
@@ -284,6 +288,7 @@ namespace perf_monitor {
         double totalUnitUpdateMs = totalUnitUpdate / 1000.0;
         double totalObjectUpdateHandlerMs = totalObjectUpdateHandler / 1000.0;
         double totalPlaySpellVisualMs = totalPlaySpellVisual / 1000.0;
+        double totalUnknownOnRender1Ms = totalUnknownOnRender1 / 1000.0;
         double totalFrameOnLayerUpdateMs = totalFrameOnLayerUpdate / 1000.0;
         double totalFrameOnScriptEventMs = totalFrameOnScriptEvent / 1000.0;
         double totalEvtPaintMs = totalEvtPaint / 1000.0;
@@ -346,10 +351,17 @@ namespace perf_monitor {
 //            allStats.emplace_back(cWorldRenderPercent, ss.str());
 
             ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "CWorldSceneRender:"
+            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CWorldSceneRender:"
                << std::right << std::setw(6) << cWorldSceneRenderPercent << "% ("
                << std::right << std::setw(8) << totalCWorldSceneRenderMs << " ms)";
             allStats.emplace_back(cWorldSceneRenderPercent, ss.str());
+
+            ss.str("");
+            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  UnknownOnRender1:"
+               << std::right << std::setw(6) << unknownOnRender1Percent << "% ("
+               << std::right << std::setw(8) << totalUnknownOnRender1Ms << " ms)";
+            allStats.emplace_back(unknownOnRender1Percent, ss.str());
+
 
 //            ss.str("");
 //            ss << std::fixed << std::setprecision(2) << "TimeBetweenRender: " << timeBetweenRenderPercent << "% ("
@@ -379,13 +391,13 @@ namespace perf_monitor {
             allStats.emplace_back(onWorldUpdatePercent, ss.str());
 
             ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "CWorldUpdate:"
+            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CWorldUpdate:"
                << std::right << std::setw(6) << cWorldUpdatePercent << "% ("
                << std::right << std::setw(8) << totalCWorldUpdateMs << " ms)";
             allStats.emplace_back(cWorldUpdatePercent, ss.str());
 
             ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "UnitUpdate:"
+            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  UnitUpdate:"
                << std::right << std::setw(6) << unitUpdatePercent << "% ("
                << std::right << std::setw(8) << totalUnitUpdateMs << " ms)";
             allStats.emplace_back(unitUpdatePercent, ss.str());
@@ -465,10 +477,16 @@ namespace perf_monitor {
         gCSimpleTopOnLayerUpdateStats.outputStats();
 //        gRenderWorldStats.outputStats();
         gOnWorldRenderStats.outputStats();
-        gOnWorldUpdateStats.outputStats();
-//        gCWorldRenderStats.outputStats();
+        gUnknownOnRender1Stats.outputStats();
         gCWorldSceneRenderStats.outputStats();
+
+        gOnWorldUpdateStats.outputStats();
+        gUnitUpdateStats.outputStats();
         gCWorldUpdateStats.outputStats();
+
+//        gCWorldRenderStats.outputStats();
+
+        NEWLINE_LOG();
 //        gCWorldUnknownRenderStats.outputStats();
 //        gTimeBetweenRenderStats.outputStats();
 //        gCSimpleFrameOnFrameRender1Stats.outputStats();
@@ -476,7 +494,6 @@ namespace perf_monitor {
 //        gCSimpleModelOnFrameRenderStats.outputStats();
 //        gSpellVisualsRenderStats.outputStats();
 //        gSpellVisualsTickStats.outputStats();
-        gUnitUpdateStats.outputStats();
         gObjectUpdateHandlerStats.outputStats();
         gPlaySpellVisualStats.outputStats();
 
@@ -588,7 +605,7 @@ namespace perf_monitor {
 
         // --- EVENT CODE DURATION STATISTICS (TOP 10) ---
         if (!gEventCodeStats.empty()) {
-            DEBUG_LOG("--- TOTAL EVENT DURATION STATISTICS (SHOULD INCLUDE MISSING ADDONS) ---");
+            DEBUG_LOG("--- TOTAL EVENT DURATION STATISTICS (SHOULD INCLUDE ALL ADDONS) ---");
 
             // Sort event codes by total time
             std::vector<std::pair<double, int>> eventCodeStats;
@@ -626,6 +643,7 @@ namespace perf_monitor {
         gUnitUpdateStats.clearStats();
         gObjectUpdateHandlerStats.clearStats();
         gPlaySpellVisualStats.clearStats();
+        gUnknownOnRender1Stats.clearStats();
         gFrameOnLayerUpdateStats.clearStats();
 
         // Clear addon stats
@@ -894,6 +912,22 @@ namespace perf_monitor {
             gSpellVisualStatsById[spellId].update(duration);
         }
     }
+
+    // UnknownOnRender1 hook
+    int UnknownOnRender1Hook(hadesmem::PatchDetourBase *detour, void *this_ptr, void *dummy_edx, float *param_1) {
+        auto const UnknownOnRender1 = detour->GetTrampolineT<UnknownOnRender1T>();
+        auto start = std::chrono::high_resolution_clock::now();
+        auto result = UnknownOnRender1(this_ptr, dummy_edx, param_1);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Update stats without outputting
+        gUnknownOnRender1Stats.update(duration);
+
+        return result;
+    }
+
 
     // Add these new hook functions
     void
@@ -1269,10 +1303,14 @@ namespace perf_monitor {
         initializeHook<StdcallT>(process, Offsets::SpellVisualsTick, &SpellVisualsTickHook);
 
         // Hook PlaySpellVisual - DISABLED
-        // initializeHook<PlaySpellVisualT>(process, Offsets::PlaySpellVisual, &PlaySpellVisualHook);
+        initializeHook<PlaySpellVisualT>(process, Offsets::PlaySpellVisual, &PlaySpellVisualHook);
 
         // Hook UnitUpdate
         initializeHook<FastcallFrameT>(process, Offsets::CGWorldFrameUnitUpdate, &UnitUpdateHook);
+
+        // Hook UnknownOnRender1
+        initializeHook<UnknownOnRender1T>(process, Offsets::UnknownOnRender1, &UnknownOnRender1Hook);
+
 
         // Hook ObjectUpdateHandler
         initializeHook<PacketHandlerT>(process, Offsets::ObjectUpdateHandler, &ObjectUpdateHandlerHook);
