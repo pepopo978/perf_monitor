@@ -75,18 +75,25 @@ namespace perf_monitor {
 
     using PlaySpellVisualT = void (__fastcall *)(uintptr_t *unit, uintptr_t *unk, uintptr_t *spellRec, uintptr_t *visualKit, void *param_3, void *param_4);
 
-    using UnknownOnRender1T = int (__fastcall *)(void *this_ptr, void *dummy_edx, float *param_1);
+    using UnknownOnRender1T = void (__stdcall *)(void);
+    using UnknownOnRender2T = void (__stdcall *)(void);
+    using UnknownOnRender3T = void (__stdcall *)(void);
 
+    using PaintScreenT = void (__stdcall *)(uint32_t param_1, uint32_t param_2);
+
+    using CM2SceneAdvanceTimeT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, uint32_t param_1);
+    using CM2SceneAnimateT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, float *param_1);
+    using CM2SceneDrawT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, int param_1);
 
     using PacketHandlerT = int (__stdcall *)(uintptr_t *param_1, CDataStore *dataStore);
 
     inline bool IsValidAsciiString(const char* str, size_t maxLen = 256) {
         if (!str) return false;
         if (IsBadReadPtr(const_cast<void*>(reinterpret_cast<const void*>(str)), 1) != 0) return false;
-        
+
         size_t len = 0;
         bool hasAlpha = false;
-        
+
         for (size_t i = 0; i < maxLen; ++i) {
             if (IsBadReadPtr(const_cast<void*>(reinterpret_cast<const void*>(str + i)), 1) != 0) return false;
             if (str[i] == '\0') {
@@ -98,35 +105,35 @@ namespace perf_monitor {
                 hasAlpha = true;
             }
         }
-        
+
         return len >= 3 && hasAlpha;
     }
 
     inline void PrintValidStrings(uintptr_t* basePtr, size_t arraySize = 150, const char* logPrefix = "String") {
         if (!basePtr) return;
-        
+
         for (size_t i = 0; i < arraySize; ++i) {
             if (basePtr[i] != 0 && IsBadReadPtr(reinterpret_cast<void*>(basePtr[i]), 1) == 0) {
                 auto potentialString0 = reinterpret_cast<const char*>(basePtr[i]);
                 if (IsValidAsciiString(potentialString0)) {
                     DEBUG_LOG(logPrefix << "[" << i << "]: " << potentialString0);
                 }
-                
+
                 auto level1Ptr = reinterpret_cast<uintptr_t*>(basePtr[i]);
-                
+
                 for (size_t j = 0; j < 450; ++j) {
                     if (level1Ptr[j] != 0 && IsBadReadPtr(reinterpret_cast<void*>(level1Ptr[j]), 1) == 0) {
                         auto potentialString1 = reinterpret_cast<const char*>(level1Ptr[j]);
                         if (IsValidAsciiString(potentialString1)) {
                             DEBUG_LOG(logPrefix << "[" << i << "][" << j << "]: " << potentialString1);
                         }
-                        
+
                         auto level2Ptr = reinterpret_cast<uintptr_t*>(level1Ptr[j]);
-                        
+
                         for (size_t k = 0; k < 64; ++k) {
                             if (level2Ptr[k] != 0 && IsBadReadPtr(reinterpret_cast<void*>(level2Ptr[k]), 1) == 0) {
                                 auto potentialString2 = reinterpret_cast<const char*>(level2Ptr[k]);
-                                
+
                                 if (IsValidAsciiString(potentialString2)) {
                                     DEBUG_LOG(logPrefix << "[" << i << "][" << j << "][" << k << "]: " << potentialString2);
                                 }

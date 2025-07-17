@@ -54,10 +54,13 @@ enum class Offsets : std::uint32_t {
     SpellVisualsTick = 0X006ECA20,
     PlaySpellVisual = 0X0060EDF0,
     CWorldUnknownRender = 0X0069A3E0,
-    UnknownOnRender1 = 0x00707680,
+    UnknownOnRender1 = 0x0069a3e0,
+    UnknownOnRender2 = 0x006813d0,
+    UnknownOnRender3 = 0x006816d0,
 
     ObjectUpdateHandler = 0x004651a0,
 
+    PaintScreen = 0x00764330,
     CSimpleTopOnLayerUpdate = 0X00765650,
     CSimpleTopOnLayerRender = 0X007657D0,
 
@@ -74,6 +77,10 @@ enum class Offsets : std::uint32_t {
 
     SignalEvent = 0X00703E50,
     SignalEventParam = 0X00703F50,
+
+    CM2SceneAdvanceTime = 0X007074B0,
+    CM2SceneAnimate = 0X00707680,
+    CM2SceneDraw = 0X00708900,
 
     RunningAddonName = 0X00CEEAC0,
 };
