@@ -82,5 +82,23 @@ enum class Offsets : std::uint32_t {
     CM2SceneAnimate = 0X00707680,
     CM2SceneDraw = 0X00708900,
 
+    WorldObjectRender = 0X006EB840,  // barely impacted performance
+
     RunningAddonName = 0X00CEEAC0,
+
+    DrawBatchProj = 0x0070cb30,
+    DrawBatch = 0x0070cf70,
+    DrawBatchDoodad = 0x0070d330,
+    DrawRibbon = 0x0070d820,
+    DrawParticle = 0x0070d8b0,
+    DrawCallback = 0x0070d960,
+    CM2SceneRenderDraw = 0x0070b360,
+
+    lua_isnumber = 0X006F34D0,
+    lua_tonumber = 0X006F3620,
+
+    EventUnregisterEx = 0X0041FD90,
+    MovementIdleMoveUnits = 0X00616800,
+
+    GxRsSet = 0X00589E60
 };

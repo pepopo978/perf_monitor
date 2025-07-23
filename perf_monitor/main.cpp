@@ -46,7 +46,6 @@
 #include <algorithm>
 #include <sstream>
 #include <ctime>
-#include <intrin.h>
 
 BOOL WINAPI DllMain(HINSTANCE, uint32_t, void *);
 
@@ -57,36 +56,6 @@ namespace perf_monitor {
 
     // Keep SpellVisualsInitDetour as it's used specifically in DllMain
     std::unique_ptr<hadesmem::PatchDetour<SpellVisualsInitializeT >> gSpellVisualsInitDetour;
-
-    // Create stats objects for each monitored function
-    FunctionStats gRenderWorldStats("RenderWorld");
-    FunctionStats gOnWorldRenderStats("OnWorldRender");
-    FunctionStats gOnWorldUpdateStats("OnWorldUpdate");
-    FunctionStats gSpellVisualsRenderStats("SpellVisualsRender");
-    FunctionStats gSpellVisualsTickStats("SpellVisualsTick");
-    FunctionStats gUnitUpdateStats("UnitUpdate");
-    FunctionStats gFrameOnLayerUpdateStats("All OnUpdates");
-    FunctionStats gCWorldRenderStats("CWorldRender");
-    FunctionStats gCWorldUpdateStats("CWorldUpdate");
-    FunctionStats gCWorldSceneRenderStats("CWorldSceneRender");
-    FunctionStats gCWorldUnknownRenderStats("CWorldUnknownRender");
-    FunctionStats gTimeBetweenRenderStats("TimeBetweenRender");
-    FunctionStats gFrameOnScriptEventStats("All Event Handling");
-    FunctionStats gCSimpleFrameOnFrameRender1Stats("CSimpleFrameOnFrameRender1");
-    FunctionStats gCSimpleFrameOnFrameRender2Stats("CSimpleFrameOnFrameRender2");
-    FunctionStats gCSimpleModelOnFrameRenderStats("CSimpleModelOnFrameRender");
-    FunctionStats gCSimpleTopOnLayerUpdateStats("UIParent OnUpdate");
-    FunctionStats gCSimpleTopOnLayerRenderStats("UIParent OnRender");
-    FunctionStats gObjectUpdateHandlerStats("ObjectUpdateHandler");
-    FunctionStats gPlaySpellVisualStats("PlaySpellVisual");
-    FunctionStats gUnknownOnRender1Stats("UnknownOnRender1");
-    FunctionStats gUnknownOnRender2Stats("UnknownOnRender2");
-    FunctionStats gUnknownOnRender3Stats("UnknownOnRender3");
-    FunctionStats gCM2SceneAdvanceTimeStats("CM2Scene::AdvanceTime");
-    FunctionStats gCM2SceneAnimateStats("CM2Scene::Animate");
-    FunctionStats gCM2SceneDrawStats("CM2Scene::Draw");
-    FunctionStats gPaintScreenStats("PaintScreen");
-
 
     // Track 5 slowest events for each addon
     std::map<std::string, std::vector<EventStats>> gAddonEventStats;
@@ -99,7 +68,7 @@ namespace perf_monitor {
 
     // Early alphabetical Ace addons that are likely to get associated with other addons events
     std::set<std::string> gAceAddonBlacklist = {
-            //"pfUI",
+            "pfUI",
             "AI_VoiceOver",
             "AtlasLoot",
             "BigWigs"
@@ -112,6 +81,9 @@ namespace perf_monitor {
     std::map<EVENT_ID, size_t> gEventCounts;
     uint64_t gLastEventStatsTime = 0;
     std::chrono::high_resolution_clock::time_point gCWorldSceneRenderEndTime;
+
+    // Track when we're drawing the world scene
+    bool gIsDrawingWorldScene = false;
 
     uint32_t GetTime() {
         return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -151,11 +123,11 @@ namespace perf_monitor {
             if (frameName != nullptr && IsValidAsciiString(frameName)) {
                 frameNameStr = std::string(frameName);
 
-                // uncomment if you want to see individual pfui frame performance
-                if (frameNameStr.length() >= 2 && frameNameStr.substr(0, 2) == "pf") {
-                    // Special handling for pfUI
-                    frameNameStr = "pfUI";
-                }
+                // comment if you want to see individual pfui frame performance
+//                if (frameNameStr.length() >= 2 && frameNameStr.substr(0, 2) == "pf") {
+//                    // Special handling for pfUI
+//                    frameNameStr = "pfUI";
+//                }
 
                 // Ignore frame names ending with .dll
                 if (frameNameStr.length() >= 4 && frameNameStr.substr(frameNameStr.length() - 4) == ".dll") {
@@ -213,519 +185,6 @@ namespace perf_monitor {
             // Add new event code
             eventStats.emplace_back(eventCode, duration);
         }
-    }
-
-    void OutputStats(uint64_t startTime, uint64_t endTime) {
-        auto callCount = gRenderWorldStats.callCount;
-
-        // Store the totals before clearing the stats
-        double totalCSimpleTopOnLayerUpdate = gCSimpleTopOnLayerUpdateStats.totalTime;
-        double totalCSimpleTopOnLayerRender = gCSimpleTopOnLayerRenderStats.totalTime;
-        double totalPaintScreen = gPaintScreenStats.totalTime;
-
-        double totalOnWorldRender = gOnWorldRenderStats.totalTime;
-        double totalOnWorldUpdate = gOnWorldUpdateStats.totalTime;
-        double totalSpellVisualsRender = gSpellVisualsRenderStats.totalTime;
-        double totalSpellVisualsTick = gSpellVisualsTickStats.totalTime;
-        double totalUnitUpdate = gUnitUpdateStats.totalTime;
-        double totalObjectUpdateHandler = gObjectUpdateHandlerStats.totalTime;
-        double totalPlaySpellVisual = gPlaySpellVisualStats.totalTime;
-        double totalUnknownOnRender1 = gUnknownOnRender1Stats.totalTime;
-        double totalUnknownOnRender2 = gUnknownOnRender2Stats.totalTime;
-        double totalUnknownOnRender3 = gUnknownOnRender3Stats.totalTime;
-        double totalCM2SceneAdvanceTime = gCM2SceneAdvanceTimeStats.totalTime;
-        double totalCM2SceneAnimate = gCM2SceneAnimateStats.totalTime;
-        double totalCM2SceneDraw = gCM2SceneDrawStats.totalTime;
-        double totalFrameOnLayerUpdate = gFrameOnLayerUpdateStats.totalTime;
-        double totalCWorldRender = gCWorldRenderStats.totalTime;
-        double totalCWorldUpdate = gCWorldUpdateStats.totalTime;
-        double totalCWorldSceneRender = gCWorldSceneRenderStats.totalTime;
-        double totalCWorldUnknownRender = gCWorldUnknownRenderStats.totalTime;
-        double totalTimeBetweenRender = gTimeBetweenRenderStats.totalTime;
-
-        double totalFrameOnScriptEvent = gFrameOnScriptEventStats.totalTime;
-        double totalCSimpleFrameOnFrameRender1 = gCSimpleFrameOnFrameRender1Stats.totalTime;
-        double totalCSimpleFrameOnFrameRender2 = gCSimpleFrameOnFrameRender2Stats.totalTime;
-        double totalCSimpleModelOnFrameRender = gCSimpleModelOnFrameRenderStats.totalTime;
-
-        // Get the total time for evt_Paint and evt_Idle
-        double totalEvtPaint = gEventStats[EVENT_ID_PAINT].totalTime;
-        double totalEvtIdle = gEventStats[EVENT_ID_IDLE].totalTime;
-
-        // Calculate percentages of frame time using cumulative times
-        double onWorldRenderPercent = (totalPaintScreen > 0) ?
-                                      (totalOnWorldRender / totalPaintScreen) * 100.0 : 0.0;
-        double onWorldUpdatePercent = (totalPaintScreen > 0) ?
-                                      (totalOnWorldUpdate / totalPaintScreen) * 100.0 : 0.0;
-        double spellVisualsRenderPercent = (totalPaintScreen > 0) ?
-                                           (totalSpellVisualsRender / totalPaintScreen) * 100.0 : 0.0;
-        double spellVisualsTickPercent = (totalPaintScreen > 0) ?
-                                         (totalSpellVisualsTick / totalPaintScreen) * 100.0 : 0.0;
-        double unitUpdatePercent = (totalPaintScreen > 0) ?
-                                   (totalUnitUpdate / totalPaintScreen) * 100.0 : 0.0;
-        double objectUpdateHandlerPercent = (totalPaintScreen > 0) ?
-                                            (totalObjectUpdateHandler / totalPaintScreen) * 100.0 : 0.0;
-        double playSpellVisualPercent = (totalPaintScreen > 0) ?
-                                        (totalPlaySpellVisual / totalPaintScreen) * 100.0 : 0.0;
-        double unknownOnRender1Percent = (totalPaintScreen > 0) ?
-                                         (totalUnknownOnRender1 / totalPaintScreen) * 100.0 : 0.0;
-        double unknownOnRender2Percent = (totalPaintScreen > 0) ?
-                                         (totalUnknownOnRender2 / totalPaintScreen) * 100.0 : 0.0;
-        double unknownOnRender3Percent = (totalPaintScreen > 0) ?
-                                         (totalUnknownOnRender3 / totalPaintScreen) * 100.0 : 0.0;
-        double cM2SceneAdvanceTimePercent = (totalPaintScreen > 0) ?
-                                            (totalCM2SceneAdvanceTime / totalPaintScreen) * 100.0 : 0.0;
-        double cM2SceneAnimatePercent = (totalPaintScreen > 0) ?
-                                        (totalCM2SceneAnimate / totalPaintScreen) * 100.0 : 0.0;
-        double cM2SceneDrawPercent = (totalPaintScreen > 0) ?
-                                     (totalCM2SceneDraw / totalPaintScreen) * 100.0 : 0.0;
-        double frameOnLayerUpdatePercent = (totalPaintScreen > 0) ?
-                                           (totalFrameOnLayerUpdate / totalPaintScreen) * 100.0 : 0.0;
-        double cWorldRenderPercent = (totalPaintScreen > 0) ?
-                                     (totalCWorldRender / totalPaintScreen) * 100.0 : 0.0;
-        double cWorldUpdatePercent = (totalPaintScreen > 0) ?
-                                     (totalCWorldUpdate / totalPaintScreen) * 100.0 : 0.0;
-        double cWorldSceneRenderPercent = (totalPaintScreen > 0) ?
-                                          (totalCWorldSceneRender / totalPaintScreen) * 100.0 : 0.0;
-        double cWorldUnknownRenderPercent = (totalPaintScreen > 0) ?
-                                            (totalCWorldUnknownRender / totalPaintScreen) * 100.0 : 0.0;
-        double timeBetweenRenderPercent = (totalPaintScreen > 0) ?
-                                          (totalTimeBetweenRender / totalPaintScreen) * 100.0 : 0.0;
-        double frameOnScriptEventPercent = (totalPaintScreen > 0) ?
-                                           (totalFrameOnScriptEvent / totalPaintScreen) * 100.0 : 0.0;
-
-        // Convert microseconds to milliseconds for display
-        double totalOnWorldRenderMs = totalOnWorldRender / 1000.0;
-        double totalOnWorldUpdateMs = totalOnWorldUpdate / 1000.0;
-        double totalCWorldRenderMs = totalCWorldRender / 1000.0;
-        double totalCWorldUpdateMs = totalCWorldUpdate / 1000.0;
-        double totalCWorldSceneRenderMs = totalCWorldSceneRender / 1000.0;
-        double totalCWorldUnknownRenderMs = totalCWorldUnknownRender / 1000.0;
-        double totalTimeBetweenRenderMs = totalTimeBetweenRender / 1000.0;
-        double totalSpellVisualsRenderMs = totalSpellVisualsRender / 1000.0;
-        double totalSpellVisualsTickMs = totalSpellVisualsTick / 1000.0;
-        double totalUnitUpdateMs = totalUnitUpdate / 1000.0;
-        double totalObjectUpdateHandlerMs = totalObjectUpdateHandler / 1000.0;
-        double totalPlaySpellVisualMs = totalPlaySpellVisual / 1000.0;
-        double totalUnknownOnRender1Ms = totalUnknownOnRender1 / 1000.0;
-        double totalUnknownOnRender2Ms = totalUnknownOnRender2 / 1000.0;
-        double totalUnknownOnRender3Ms = totalUnknownOnRender3 / 1000.0;
-        double totalCM2SceneAdvanceTimeMs = totalCM2SceneAdvanceTime / 1000.0;
-        double totalCM2SceneAnimateMs = totalCM2SceneAnimate / 1000.0;
-        double totalCM2SceneDrawMs = totalCM2SceneDraw / 1000.0;
-        double totalFrameOnLayerUpdateMs = totalFrameOnLayerUpdate / 1000.0;
-        double totalFrameOnScriptEventMs = totalFrameOnScriptEvent / 1000.0;
-        double totalEvtPaintMs = totalEvtPaint / 1000.0;
-        double totalEvtIdleMs = totalEvtIdle / 1000.0;
-        double totalCSimpleTopOnLayerUpdateMs = totalCSimpleTopOnLayerUpdate / 1000.0;
-        double totalCSimpleTopOnLayerRenderMs = totalCSimpleTopOnLayerRender / 1000.0;
-        double totalCSimpleFrameOnFrameRender1Ms = totalCSimpleFrameOnFrameRender1 / 1000.0;
-        double totalCSimpleFrameOnFrameRender2Ms = totalCSimpleFrameOnFrameRender2 / 1000.0;
-        double totalCSimpleModelOnFrameRenderMs = totalCSimpleModelOnFrameRender / 1000.0;
-
-        // --- SUMMARY ---
-        DEBUG_LOG(
-                "--------------------------------------------------------------------------------------------------------------------------------------");
-        // Calculate start time by subtracting 30 seconds from current time
-        auto now = std::chrono::system_clock::now();
-        auto thirtySecondsAgo = now - std::chrono::seconds(30);
-        std::time_t start_time_t = std::chrono::system_clock::to_time_t(thirtySecondsAgo);
-        std::time_t end_time_t = std::chrono::system_clock::to_time_t(now);
-
-        std::tm start_tm, end_tm;
-#ifdef _WIN32
-        localtime_s(&start_tm, &start_time_t);
-        localtime_s(&end_tm, &end_time_t);
-#else
-        localtime_r(&start_time_t, &start_tm);
-        localtime_r(&end_time_t, &end_tm);
-#endif
-
-        std::ostringstream start_oss, end_oss;
-        start_oss << std::put_time(&start_tm, "%m-%d %H:%M:%S");
-        end_oss << std::put_time(&end_tm, "%m-%d %H:%M:%S");
-
-        DEBUG_LOG("--- STATS from " << start_oss.str() << " to " << end_oss.str() << " ---");
-        
-        // Convert PaintScreen to milliseconds
-        double totalPaintScreenMs = totalPaintScreen / 1000.0;
-        
-        DEBUG_LOG(
-                std::fixed << std::setprecision(2)
-                           << "[Total] Render: " << std::right << std::setw(8) << totalPaintScreenMs
-                           << " ms.  Frames: " << std::right << std::setw(6) << gPaintScreenStats.callCount
-                           << ".  Time per frame: " << std::right << std::setw(6)
-                           << (gPaintScreenStats.callCount > 0 ? totalPaintScreenMs /
-                                                                             gPaintScreenStats.callCount
-                                                                           : 0.0)
-                           << " ms.  Avg fps: "
-                           << std::right << std::setw(6)
-                           << (callCount > 0 ? callCount / (STATS_OUTPUT_INTERVAL_MS / 1000.0) : 0.0));
-
-        {
-            DEBUG_LOG("--- FUNCTION STATS (% OF TOTAL RENDER) ---");
-
-            std::vector<std::pair<double, std::string>> allStats;
-            std::stringstream ss;
-
-            // OnWorldRender group - show parent then sorted sub-functions
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "OnWorldRender:"
-               << std::right << std::setw(6) << onWorldRenderPercent << "% ("
-               << std::right << std::setw(8) << totalOnWorldRenderMs << " ms)";
-            DEBUG_LOG(ss.str());
-
-            // OnWorldRender sub-functions sorted by performance
-            std::vector<std::pair<double, std::string>> renderStats;
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  UnknownOnRender1:"
-               << std::right << std::setw(6) << unknownOnRender1Percent << "% ("
-               << std::right << std::setw(8) << totalUnknownOnRender1Ms << " ms)";
-            renderStats.emplace_back(unknownOnRender1Percent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  UnknownOnRender2:"
-               << std::right << std::setw(6) << unknownOnRender2Percent << "% ("
-               << std::right << std::setw(8) << totalUnknownOnRender2Ms << " ms)";
-            renderStats.emplace_back(unknownOnRender2Percent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  UnknownOnRender3:"
-               << std::right << std::setw(6) << unknownOnRender3Percent << "% ("
-               << std::right << std::setw(8) << totalUnknownOnRender3Ms << " ms)";
-            renderStats.emplace_back(unknownOnRender3Percent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CM2Scene::AdvanceTime:"
-               << std::right << std::setw(6) << cM2SceneAdvanceTimePercent << "% ("
-               << std::right << std::setw(8) << totalCM2SceneAdvanceTimeMs << " ms)";
-            renderStats.emplace_back(cM2SceneAdvanceTimePercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CWorldSceneRender:"
-               << std::right << std::setw(6) << cWorldSceneRenderPercent << "% ("
-               << std::right << std::setw(8) << totalCWorldSceneRenderMs << " ms)";
-            renderStats.emplace_back(cWorldSceneRenderPercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CWorldRender:"
-               << std::right << std::setw(6) << cWorldRenderPercent << "% ("
-               << std::right << std::setw(8) << totalCWorldRenderMs << " ms)";
-            renderStats.emplace_back(cWorldRenderPercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CM2Scene::Animate:"
-               << std::right << std::setw(6) << cM2SceneAnimatePercent << "% ("
-               << std::right << std::setw(8) << totalCM2SceneAnimateMs << " ms)";
-            renderStats.emplace_back(cM2SceneAnimatePercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CM2Scene::Draw:"
-               << std::right << std::setw(6) << cM2SceneDrawPercent << "% ("
-               << std::right << std::setw(8) << totalCM2SceneDrawMs << " ms)";
-            renderStats.emplace_back(cM2SceneDrawPercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  SpellVisualsTick:"
-               << std::right << std::setw(6) << spellVisualsTickPercent << "% ("
-               << std::right << std::setw(8) << totalSpellVisualsTickMs << " ms)";
-            renderStats.emplace_back(spellVisualsTickPercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  SpellVisualsRender:"
-               << std::right << std::setw(6) << spellVisualsRenderPercent << "% ("
-               << std::right << std::setw(8) << totalSpellVisualsRenderMs << " ms)";
-            renderStats.emplace_back(spellVisualsRenderPercent, ss.str());
-
-            // Sort and display OnWorldRender sub-functions
-            std::sort(renderStats.rbegin(), renderStats.rend());
-            for (const auto &stat: renderStats) {
-                DEBUG_LOG(stat.second);
-            }
-
-            // OnWorldUpdate group - show parent then sorted sub-functions
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "OnWorldUpdate:"
-               << std::right << std::setw(6) << onWorldUpdatePercent << "% ("
-               << std::right << std::setw(8) << totalOnWorldUpdateMs << " ms)";
-            DEBUG_LOG(ss.str());
-
-            // OnWorldUpdate sub-functions sorted by performance
-            std::vector<std::pair<double, std::string>> updateStats;
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  CWorldUpdate:"
-               << std::right << std::setw(6) << cWorldUpdatePercent << "% ("
-               << std::right << std::setw(8) << totalCWorldUpdateMs << " ms)";
-            updateStats.emplace_back(cWorldUpdatePercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "  UnitUpdate:"
-               << std::right << std::setw(6) << unitUpdatePercent << "% ("
-               << std::right << std::setw(8) << totalUnitUpdateMs << " ms)";
-            updateStats.emplace_back(unitUpdatePercent, ss.str());
-
-            // Sort and display OnWorldUpdate sub-functions
-            std::sort(updateStats.rbegin(), updateStats.rend());
-            for (const auto &stat: updateStats) {
-                DEBUG_LOG(stat.second);
-            }
-
-            DEBUG_LOG("------");
-
-            // Now add remaining stats to be sorted at top level
-            allStats.clear();
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "ObjectUpdateHandler:"
-               << std::right << std::setw(6) << objectUpdateHandlerPercent << "% ("
-               << std::right << std::setw(8) << totalObjectUpdateHandlerMs << " ms)";
-            allStats.emplace_back(objectUpdateHandlerPercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "PlaySpellVisual:"
-               << std::right << std::setw(6) << playSpellVisualPercent << "% ("
-               << std::right << std::setw(8) << totalPlaySpellVisualMs << " ms)";
-            allStats.emplace_back(playSpellVisualPercent, ss.str());
-
-            // Frame stats
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "All OnUpdates:"
-               << std::right << std::setw(6) << frameOnLayerUpdatePercent << "% ("
-               << std::right << std::setw(8) << totalFrameOnLayerUpdateMs << " ms)";
-            allStats.emplace_back(frameOnLayerUpdatePercent, ss.str());
-
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "All Events:"
-               << std::right << std::setw(6) << frameOnScriptEventPercent << "% ("
-               << std::right << std::setw(8) << totalFrameOnScriptEventMs << " ms)";
-            allStats.emplace_back(frameOnScriptEventPercent, ss.str());
-
-            double cSimpleTopOnLayerUpdatePercent = (totalPaintScreen > 0 ? (totalCSimpleTopOnLayerUpdate /
-                                                                            totalPaintScreen * 100.0) : 0.0);
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "UIParent OnUpdate:"
-               << std::right << std::setw(6) << cSimpleTopOnLayerUpdatePercent << "% ("
-               << std::right << std::setw(8) << totalCSimpleTopOnLayerUpdateMs << " ms)";
-            allStats.emplace_back(cSimpleTopOnLayerUpdatePercent, ss.str());
-
-            std::sort(allStats.rbegin(), allStats.rend());
-
-            for (const auto &stat: allStats) {
-                DEBUG_LOG(stat.second);
-            }
-        }
-        NEWLINE_LOG();
-
-        // --- DETAILED STATS ---
-        DEBUG_LOG("--- DETAILED STATS ---");
-        gPaintScreenStats.outputStats();
-        gCSimpleTopOnLayerRenderStats.outputStats();
-        gCSimpleTopOnLayerUpdateStats.outputStats();
-        NEWLINE_LOG();
-        gOnWorldRenderStats.outputStats();
-        gUnknownOnRender1Stats.outputStats();
-        gUnknownOnRender2Stats.outputStats();
-        gUnknownOnRender3Stats.outputStats();
-        gCM2SceneAdvanceTimeStats.outputStats();
-        gCM2SceneAnimateStats.outputStats();
-        gCM2SceneDrawStats.outputStats();
-        gCWorldSceneRenderStats.outputStats();
-        NEWLINE_LOG();
-        gOnWorldUpdateStats.outputStats();
-        gUnitUpdateStats.outputStats();
-        gCWorldUpdateStats.outputStats();
-
-        NEWLINE_LOG();
-        gObjectUpdateHandlerStats.outputStats();
-        gPlaySpellVisualStats.outputStats();
-
-        gFrameOnScriptEventStats.outputStats();
-        gFrameOnLayerUpdateStats.outputStats();
-
-        NEWLINE_LOG();
-
-        // --- ADDON ONUPDATE PERFORMANCE ---
-        if (!gAddonOnUpdateStats.empty()) {
-            DEBUG_LOG("--- ADDON/FRAME ONUPDATE PERFORMANCE (min .1ms total)---");
-
-            // Sort addons by total time
-            std::vector<std::pair<double, std::string>> addonOnUpdateStats;
-            for (auto it = gAddonOnUpdateStats.begin();
-                 it != gAddonOnUpdateStats.end(); ++it) {
-                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
-                    addonOnUpdateStats.push_back(std::make_pair(it->second.totalTime, it->first));
-                }
-            }
-            std::sort(addonOnUpdateStats.rbegin(), addonOnUpdateStats.rend());
-
-            for (auto it = addonOnUpdateStats.begin();
-                 it != addonOnUpdateStats.end(); ++it) {
-                gAddonOnUpdateStats[it->second].outputStats();
-            }
-        }
-
-        // --- ADDON EVENT STATS ---
-        if (!gAddonScriptEventStats.empty()) {
-            DEBUG_LOG("--- ADDON/FRAME EVENTS PERFORMANCE (min .1ms total)---");
-
-            // Sort addons by total time
-            std::vector<std::pair<double, std::string>> addonStats;
-            for (auto it = gAddonScriptEventStats.begin();
-                 it != gAddonScriptEventStats.end(); ++it) {
-                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
-                    addonStats.push_back(std::make_pair(it->second.totalTime, it->first));
-                }
-            }
-            std::sort(addonStats.rbegin(), addonStats.rend());
-
-            for (auto it = addonStats.begin();
-                 it != addonStats.end(); ++it) {
-                gAddonScriptEventStats[it->second].outputStats();
-            }
-        }
-
-        // --- ADDON SLOWEST EVENTS REPORT ---
-        if (!gAddonEventStats.empty()) {
-            DEBUG_LOG("--- ADDON/FRAME SLOWEST EVENTS REPORT (min .1ms combined duration) ---");
-
-            for (const auto &addonPair: gAddonEventStats) {
-                const std::string &addonName = addonPair.first;
-                std::vector<EventStats> slowEvents = addonPair.second; // Copy for sorting
-
-                if (!slowEvents.empty()) {
-                    // Calculate total duration for this addon
-                    double totalAddonDuration = 0.0;
-                    for (const auto &event: slowEvents) {
-                        totalAddonDuration += event.duration;
-                    }
-
-                    // Skip if total duration is less than 0.1ms (100 microseconds)
-                    if (totalAddonDuration < 100.0) {
-                        continue;
-                    }
-
-                    // Sort events by duration (descending) only when displaying
-                    std::sort(slowEvents.begin(), slowEvents.end());
-
-                    // Only show top 10 slowest events
-                    size_t eventsToShow = slowEvents.size() < 10 ? slowEvents.size() : 10;
-                    DEBUG_LOG("[" << addonName << "] Top " << eventsToShow << " slowest events (out of "
-                                  << slowEvents.size() << " total):");
-
-                    for (size_t i = 0; i < eventsToShow; ++i) {
-                        const EventStats &event = slowEvents[i];
-                        DEBUG_LOG("  " << std::right << std::setw(2) << (i + 1) << ".  "
-                                       << std::left << std::setw(50) << GetEventName(event.eventCode)
-                                       << " Total Duration: " << std::right << std::setw(8) << std::fixed
-                                       << std::setprecision(3)
-                                       << event.duration / 1000.0 << " ms"
-                                       << "      Count: " << std::right << std::setw(6) << event.count);
-                    }
-                }
-            }
-        }
-
-        // --- SPELL VISUAL PERFORMANCE (TOP 10 SLOWEST) ---
-        if (!gSpellVisualStatsById.empty()) {
-            DEBUG_LOG("--- SPELL VISUAL PERFORMANCE (min .1ms total) ---");
-
-            // Sort spells by total time
-            std::vector<std::pair<double, uint32_t>> spellStats;
-            for (auto it = gSpellVisualStatsById.begin(); it != gSpellVisualStatsById.end(); ++it) {
-                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
-                    spellStats.push_back(std::make_pair(it->second.totalTime, it->first));
-                }
-            }
-            std::sort(spellStats.rbegin(), spellStats.rend());
-
-            // Show only top 10 spells
-            size_t spellsToShow = spellStats.size() < 10 ? spellStats.size() : 10;
-            for (size_t i = 0; i < spellsToShow; ++i) {
-                gSpellVisualStatsById[spellStats[i].second].outputStats(20);
-            }
-        }
-
-        // --- EVENT CODE DURATION STATISTICS (TOP 10) ---
-        if (!gEventCodeStats.empty()) {
-            DEBUG_LOG("--- TOTAL EVENT DURATION STATISTICS (SHOULD INCLUDE ALL ADDONS) ---");
-
-            // Sort event codes by total time
-            std::vector<std::pair<double, int>> eventCodeStats;
-            for (auto it = gEventCodeStats.begin(); it != gEventCodeStats.end(); ++it) {
-                if (it->second.callCount > 0) {
-                    eventCodeStats.push_back(std::make_pair(it->second.totalTime, it->first));
-                }
-            }
-            std::sort(eventCodeStats.rbegin(), eventCodeStats.rend());
-
-            // Show only top 10 events
-            size_t eventsToShow = eventCodeStats.size() < 10 ? eventCodeStats.size() : 10;
-            for (size_t i = 0; i < eventsToShow; ++i) {
-                gEventCodeStats[eventCodeStats[i].second].outputStats(45);
-            }
-        }
-
-        // Clear all stats
-        gRenderWorldStats.clearStats();
-        gOnWorldRenderStats.clearStats();
-        gOnWorldUpdateStats.clearStats();
-        gCWorldRenderStats.clearStats();
-        gCWorldUpdateStats.clearStats();
-        gCWorldSceneRenderStats.clearStats();
-        gCWorldUnknownRenderStats.clearStats();
-        gTimeBetweenRenderStats.clearStats();
-        gFrameOnScriptEventStats.clearStats();
-        gCSimpleFrameOnFrameRender1Stats.clearStats();
-        gCSimpleFrameOnFrameRender2Stats.clearStats();
-        gCSimpleModelOnFrameRenderStats.clearStats();
-        gCSimpleTopOnLayerUpdateStats.clearStats();
-        gCSimpleTopOnLayerRenderStats.clearStats();
-        gSpellVisualsRenderStats.clearStats();
-        gSpellVisualsTickStats.clearStats();
-        gUnitUpdateStats.clearStats();
-        gObjectUpdateHandlerStats.clearStats();
-        gPlaySpellVisualStats.clearStats();
-        gUnknownOnRender1Stats.clearStats();
-        gUnknownOnRender2Stats.clearStats();
-        gUnknownOnRender3Stats.clearStats();
-        gCM2SceneAdvanceTimeStats.clearStats();
-        gCM2SceneAnimateStats.clearStats();
-        gCM2SceneDrawStats.clearStats();
-        gPaintScreenStats.clearStats();
-        gFrameOnLayerUpdateStats.clearStats();
-
-        // Clear addon stats
-        for (auto it = gAddonScriptEventStats.begin();
-             it != gAddonScriptEventStats.end(); ++it) {
-            it->second.clearStats();
-        }
-
-        // Clear addon OnUpdate stats
-        for (auto it = gAddonOnUpdateStats.begin();
-             it != gAddonOnUpdateStats.end(); ++it) {
-            it->second.clearStats();
-        }
-
-        // Clear addon event stats
-        gAddonEventStats.clear();
-
-        // Clear spell visual stats
-        for (auto it = gSpellVisualStatsById.begin(); it != gSpellVisualStatsById.end(); ++it) {
-            it->second.clearStats();
-        }
-
-        // Clear event code stats
-        for (auto it = gEventCodeStats.begin(); it != gEventCodeStats.end(); ++it) {
-            it->second.clearStats();
-        }
-        gEventCodeStartTimes.clear();
-
-        DEBUG_LOG(
-                "--------------------------------------------------------------------------------------------------------------------------------------");
-
-        NEWLINE_LOG();
     }
 
     // IEvtQueueDispatch hook to track events
@@ -1056,9 +515,11 @@ namespace perf_monitor {
 
         // Check if this pointer matches the specific address
         if (this_ptr == worldScenePtr) {
+            gIsDrawingWorldScene = true;
             auto start = std::chrono::high_resolution_clock::now();
             CM2SceneDraw(this_ptr, dummy_edx, param_1);
             auto end = std::chrono::high_resolution_clock::now();
+            gIsDrawingWorldScene = false;
 
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -1069,6 +530,94 @@ namespace perf_monitor {
             CM2SceneDraw(this_ptr, dummy_edx, param_1);
         }
     }
+
+    // DrawBatchProj hook
+    void DrawBatchProjHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx) {
+        auto const DrawBatchProj = detour->GetTrampolineT<DrawBatchProjT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        DrawBatchProj(this_ptr, dummy_edx);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gDrawBatchProjStats.update(duration);
+    }
+
+    // DrawBatch hook
+    void DrawBatchHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx) {
+        auto const DrawBatch = detour->GetTrampolineT<DrawBatchT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        DrawBatch(this_ptr, dummy_edx);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gDrawBatchStats.update(duration);
+    }
+
+    // DrawBatchDoodad hook
+    void DrawBatchDoodadHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx, int param_1,
+                             int param_2) {
+        auto const DrawBatchDoodad = detour->GetTrampolineT<DrawBatchDoodadT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        DrawBatchDoodad(this_ptr, dummy_edx, param_1, param_2);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gDrawBatchDoodadStats.update(duration);
+    }
+
+    // DrawRibbon hook
+    void DrawRibbonHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx) {
+        auto const DrawRibbon = detour->GetTrampolineT<DrawRibbonT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        DrawRibbon(this_ptr, dummy_edx);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gDrawRibbonStats.update(duration);
+    }
+
+    // DrawParticle hook
+    void DrawParticleHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx) {
+//        auto const DrawParticle = detour->GetTrampolineT<DrawParticleT>();
+//        auto start = std::chrono::high_resolution_clock::now();
+//        DrawParticle(this_ptr, dummy_edx);
+//        auto end = std::chrono::high_resolution_clock::now();
+//
+//        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+//        gDrawParticleStats.update(duration);
+    }
+
+    // DrawCallback hook
+    void DrawCallbackHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx) {
+        auto const DrawCallback = detour->GetTrampolineT<DrawCallbackT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        DrawCallback(this_ptr, dummy_edx);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gDrawCallbackStats.update(duration);
+    }
+
+    // CM2SceneRender::Draw hook - only track stats when drawing world scene
+    void
+    CM2SceneRenderDrawHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx, uint32_t param_1,
+                           int param_2, int param_3, uint32_t param_4) {
+        auto const CM2SceneRenderDraw = detour->GetTrampolineT<CM2SceneRenderDrawT>();
+
+        // Only track performance when drawing world scene
+        if (gIsDrawingWorldScene) {
+            auto start = std::chrono::high_resolution_clock::now();
+            CM2SceneRenderDraw(this_ptr, dummy_edx, param_1, param_2, param_3, param_4);
+            auto end = std::chrono::high_resolution_clock::now();
+
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            gCM2SceneRenderDrawStats.update(duration);
+        } else {
+            // Call original function without timing when not drawing world scene
+            CM2SceneRenderDraw(this_ptr, dummy_edx, param_1, param_2, param_3, param_4);
+        }
+    }
+
 
     // PaintScreen hook
     void PaintScreenHook(hadesmem::PatchDetourBase *detour, uint32_t param_1, uint32_t param_2) {
@@ -1247,41 +796,8 @@ namespace perf_monitor {
         }
     }
 
-    // SignalEvent hook
-    void SignalEventHook(hadesmem::PatchDetourBase *detour, int eventCode) {
-        auto const SignalEvent = detour->GetTrampolineT<SignalEventT>();
-
-        gLastEventCode = eventCode;
-
-        SignalEvent(eventCode);
-
-        gLastEventCode = -1; // Reset after processing
-    }
-
-
-    // Original FrameScript_Execute function pointer
-    FrameScript_ExecuteT pOriginalFrameScript_Execute = nullptr;
-
-    __declspec(naked) void __cdecl FrameScript_ExecuteHook(int *param_1, int *param_2, char *param_3) {
-        __asm {
-            // Wipe gLastEventCode
-                mov eax, -1
-                mov gLastEventCode, eax
-
-            // Jump to original function (tail call)
-                jmp pOriginalFrameScript_Execute
-        }
-    }
-
-    // Original SignalEventParam function pointer
-    SignalEventParamT pOriginalSignalEventParam = nullptr;
-    // Storage for original return addresses (two needed due to recursive calls)
-    void *originalSignalEventParamReturnAddress1 = nullptr;
-    void *originalSignalEventParamReturnAddress2 = nullptr;
-    int signalEventParamNestingLevel = 0;
-
     // Helper function to log debug info safely
-    void SignalEventParamEnd(int eventCode) {
+    void SignalEventEnd(int eventCode) {
         // Find and remove the start time for this event
         auto startTimeIt = gEventCodeStartTimes.find(eventCode);
         if (startTimeIt != gEventCodeStartTimes.end()) {
@@ -1305,13 +821,58 @@ namespace perf_monitor {
         gLastEventCode = -1;
     }
 
+    // SignalEvent hook
+    void SignalEventHook(hadesmem::PatchDetourBase *detour, int eventCode) {
+        auto const SignalEvent = detour->GetTrampolineT<SignalEventT>();
+
+        gLastEventCode = eventCode;
+        gEventCodeStartTimes[eventCode] = std::chrono::high_resolution_clock::now();
+
+        SignalEvent(eventCode);
+
+        SignalEventEnd(eventCode);
+    }
+
+
+    // Original FrameScript_Execute function pointer
+    FrameScript_ExecuteT pOriginalFrameScript_Execute = nullptr;
+
+    __declspec(naked) void __cdecl FrameScript_ExecuteHook(int *param_1, int *param_2, char *param_3) {
+        __asm {
+            // Wipe gLastEventCode
+                mov eax, -1
+                mov gLastEventCode, eax
+
+            // Jump to original function (tail call)
+                jmp pOriginalFrameScript_Execute
+        }
+    }
+
+    // Original SignalEventParam function pointer
+    SignalEventParamT pOriginalSignalEventParam = nullptr;
+    // Dynamic stack for return addresses to handle arbitrary nesting levels
+    void* signalEventParamReturnAddressStack[32]; // Fixed size array for inline assembly compatibility
+    int signalEventParamStackTop = 0;
+    void* tempReturnAddress = nullptr; // Temporary storage for return address during register restoration
+
+    // Helper functions for managing the return address stack
+    void PushReturnAddress(void* address) {
+        if (signalEventParamStackTop < 32) {
+            signalEventParamReturnAddressStack[signalEventParamStackTop++] = address;
+        }
+    }
+
+    void* PopReturnAddress() {
+        if (signalEventParamStackTop <= 0) {
+            DEBUG_LOG("ERROR: Trying to pop from empty return address stack!");
+            return nullptr;
+        }
+        void* address = signalEventParamReturnAddressStack[--signalEventParamStackTop];
+        return address;
+    }
+
     void SignalEventParamStart(int eventCode, char *formatString) {
         gLastEventCode = eventCode;
-
-        // Ignore event code 392 (EXECUTE_CHAT_LINE)
-        if (eventCode == 392) {
-            return;
-        }
 
         // Record start time for this event code
         gEventCodeStartTimes[eventCode] = std::chrono::high_resolution_clock::now();
@@ -1324,33 +885,34 @@ namespace perf_monitor {
                 pushad
                 pushfd
 
-            // Call SignalEventParamEnd with the event code from the stack
+            // Call SignalEventEnd with the event code from the stack
             // The original function was called with: SignalEventParam(eventCode, formatString, ...)
             // Stack layout after pushad/pushfd: [eventCode][formatString][...][pushad 8*4][pushfd]
             // esp+36=eventCode
                 push[esp+36]            // eventCode parameter
-                call SignalEventParamEnd
+                call SignalEventEnd
                 add esp, 4               // Clean up parameter
+
+            // Call PopReturnAddress to get the return address from our stack
+                call PopReturnAddress
+                test eax, eax           // Check if we got a valid address
+                jz error_exit           // If null, something went wrong
+
+            // Store return address in global variable
+                mov tempReturnAddress, eax
 
             // Restore registers
                 popfd
                 popad
 
-            // Decrement nesting level and use LIFO approach
-                dec signalEventParamNestingLevel
-                mov eax, signalEventParamNestingLevel
-                test eax, eax
-                jz use_address1          // Level 0, use first address
+            // Jump to the original return address from global variable
+                jmp tempReturnAddress
 
-            // Level 1, use second address
-                mov eax, originalSignalEventParamReturnAddress2
-                mov originalSignalEventParamReturnAddress2, 0  // Clear the slot
-                jmp eax
-
-                use_address1:
-                mov eax, originalSignalEventParamReturnAddress1
-                mov originalSignalEventParamReturnAddress1, 0  // Clear the slot
-                jmp eax
+                error_exit:
+            // Restore registers even on error
+                popfd
+                popad
+                ret                     // Just return normally if stack is corrupted
         }
     }
 
@@ -1361,7 +923,7 @@ namespace perf_monitor {
                 pushad
                 pushfd
 
-            // Call our SignalEventParam function with parameters
+            // Call our SignalEventParamStart function with parameters
             // Stack: [ret][eventCode][formatString][...][pushad 8*4][pushfd]
             // esp+36=ret, esp+40=eventCode, esp+44=formatString
                 push[esp+44]            // formatString parameter
@@ -1369,30 +931,17 @@ namespace perf_monitor {
                 call SignalEventParamStart
                 add esp, 8               // Clean up parameters
 
-            // Restore flags and registers
+            // Restore flags and registers first
                 popfd
                 popad
 
-            // Store original return address from stack using nesting level
-                mov eax, signalEventParamNestingLevel
-                test eax, eax
-                jnz use_slot2            // Already nested, use second slot
+            // Store original return address from stack by pushing it to our dynamic stack
+            // Call PushReturnAddress with the return address
+                push[esp]               // Push the return address from stack top
+                call PushReturnAddress
+                add esp, 4               // Clean up parameter
 
-            // Level 0, use first slot
-                push[esp]               // Copy return address to top of stack
-                pop originalSignalEventParamReturnAddress1 // Pop it into our variable
-                jmp set_hook_return
-
-                use_slot2:
-            // Level 1, use second slot  
-                push[esp]               // Copy return address to top of stack
-                pop originalSignalEventParamReturnAddress2 // Pop it into our variable
-
-                set_hook_return:
-            // Increment nesting level
-                inc signalEventParamNestingLevel
-
-            // Replace return address on stack with our epilogue
+            // Replace return address on stack with PostSignalEventParamHook
                 mov eax, offset PostSignalEventParamHook
                 mov[esp], eax
 
@@ -1479,6 +1028,15 @@ namespace perf_monitor {
 
         // Hook CM2Scene::Draw
         initializeHook<CM2SceneDrawT>(process, Offsets::CM2SceneDraw, &CM2SceneDrawHook);
+
+        // Hook CM2SceneRender functions
+        initializeHook<DrawBatchProjT>(process, Offsets::DrawBatchProj, &DrawBatchProjHook);
+        initializeHook<DrawBatchT>(process, Offsets::DrawBatch, &DrawBatchHook);
+        initializeHook<DrawBatchDoodadT>(process, Offsets::DrawBatchDoodad, &DrawBatchDoodadHook);
+        initializeHook<DrawRibbonT>(process, Offsets::DrawRibbon, &DrawRibbonHook);
+        initializeHook<DrawParticleT>(process, Offsets::DrawParticle, &DrawParticleHook);
+        initializeHook<DrawCallbackT>(process, Offsets::DrawCallback, &DrawCallbackHook);
+        initializeHook<CM2SceneRenderDrawT>(process, Offsets::CM2SceneRenderDraw, &CM2SceneRenderDrawHook);
 
         // Hook ObjectUpdateHandler
         initializeHook<PacketHandlerT>(process, Offsets::ObjectUpdateHandler, &ObjectUpdateHandlerHook);

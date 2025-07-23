@@ -71,6 +71,8 @@ namespace perf_monitor {
     using lua_errorT = void (__cdecl *)(uintptr_t *, const char *);
     using lua_settopT = void (__fastcall *)(uintptr_t *, int);
 
+    using GxRsSetT = void (__fastcall *)(int renderState, int enabled);
+
     using SpellVisualsInitializeT = void (__stdcall *)(void);
 
     using PlaySpellVisualT = void (__fastcall *)(uintptr_t *unit, uintptr_t *unk, uintptr_t *spellRec, uintptr_t *visualKit, void *param_3, void *param_4);
@@ -85,7 +87,21 @@ namespace perf_monitor {
     using CM2SceneAnimateT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, float *param_1);
     using CM2SceneDrawT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, int param_1);
 
+    using DrawBatchProjT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx);
+    using DrawBatchT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx);
+    using DrawBatchDoodadT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, int param_1, int param_2);
+    using DrawRibbonT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx);
+    using DrawParticleT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx);
+    using DrawCallbackT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx);
+    using CM2SceneRenderDrawT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, uint32_t param_1, int param_2, int param_3, uint32_t param_4);
+
+    using Script_RollOnLootT = int (__fastcall *)(uintptr_t * param_1);
+
+    using MovementIdleMoveUnitsT = int (__stdcall *)(void);
+
     using PacketHandlerT = int (__stdcall *)(uintptr_t *param_1, CDataStore *dataStore);
+
+    using WorldObjectRenderT = int (__fastcall *)(int param_1, int* matrix, int param_3, int param_4, int param_5);
 
     inline bool IsValidAsciiString(const char* str, size_t maxLen = 256) {
         if (!str) return false;
@@ -109,8 +125,8 @@ namespace perf_monitor {
         return len >= 3 && hasAlpha;
     }
 
-    inline void PrintValidStrings(uintptr_t* basePtr, size_t arraySize = 150, const char* logPrefix = "String") {
-        if (!basePtr) return;
+    inline void PrintValidStrings(uintptr_t* basePtr, size_t arraySize = 150, const char* logPrefix = "String", int depth = 3) {
+        if (!basePtr || depth <= 0) return;
 
         for (size_t i = 0; i < arraySize; ++i) {
             if (basePtr[i] != 0 && IsBadReadPtr(reinterpret_cast<void*>(basePtr[i]), 1) == 0) {
@@ -119,23 +135,27 @@ namespace perf_monitor {
                     DEBUG_LOG(logPrefix << "[" << i << "]: " << potentialString0);
                 }
 
-                auto level1Ptr = reinterpret_cast<uintptr_t*>(basePtr[i]);
+                if (depth > 1) {
+                    auto level1Ptr = reinterpret_cast<uintptr_t*>(basePtr[i]);
 
-                for (size_t j = 0; j < 450; ++j) {
-                    if (level1Ptr[j] != 0 && IsBadReadPtr(reinterpret_cast<void*>(level1Ptr[j]), 1) == 0) {
-                        auto potentialString1 = reinterpret_cast<const char*>(level1Ptr[j]);
-                        if (IsValidAsciiString(potentialString1)) {
-                            DEBUG_LOG(logPrefix << "[" << i << "][" << j << "]: " << potentialString1);
-                        }
+                    for (size_t j = 0; j < arraySize; ++j) {
+                        if (level1Ptr[j] != 0 && IsBadReadPtr(reinterpret_cast<void*>(level1Ptr[j]), 1) == 0) {
+                            auto potentialString1 = reinterpret_cast<const char*>(level1Ptr[j]);
+                            if (IsValidAsciiString(potentialString1)) {
+                                DEBUG_LOG(logPrefix << "[" << i << "][" << j << "]: " << potentialString1);
+                            }
 
-                        auto level2Ptr = reinterpret_cast<uintptr_t*>(level1Ptr[j]);
+                            if (depth > 2) {
+                                auto level2Ptr = reinterpret_cast<uintptr_t*>(level1Ptr[j]);
 
-                        for (size_t k = 0; k < 64; ++k) {
-                            if (level2Ptr[k] != 0 && IsBadReadPtr(reinterpret_cast<void*>(level2Ptr[k]), 1) == 0) {
-                                auto potentialString2 = reinterpret_cast<const char*>(level2Ptr[k]);
+                                for (size_t k = 0; k < arraySize; ++k) {
+                                    if (level2Ptr[k] != 0 && IsBadReadPtr(reinterpret_cast<void*>(level2Ptr[k]), 1) == 0) {
+                                        auto potentialString2 = reinterpret_cast<const char*>(level2Ptr[k]);
 
-                                if (IsValidAsciiString(potentialString2)) {
-                                    DEBUG_LOG(logPrefix << "[" << i << "][" << j << "][" << k << "]: " << potentialString2);
+                                        if (IsValidAsciiString(potentialString2)) {
+                                            DEBUG_LOG(logPrefix << "[" << i << "][" << j << "][" << k << "]: " << potentialString2);
+                                        }
+                                    }
                                 }
                             }
                         }
