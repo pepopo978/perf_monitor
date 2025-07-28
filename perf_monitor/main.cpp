@@ -63,8 +63,13 @@ namespace perf_monitor {
     // Track addon OnUpdate performance
     std::map<std::string, FunctionStats> gAddonOnUpdateStats;
 
+
     // Track spell visual performance by spell ID
     std::map<uint32_t, FunctionStats> gSpellVisualStatsById;
+
+    // Track addon memory usage for OnEvent and OnUpdate
+    std::map<std::string, MemoryStats> gAddonOnEventMemoryStats;
+    std::map<std::string, MemoryStats> gAddonOnUpdateMemoryStats;
 
     // Early alphabetical Ace addons that are likely to get associated with other addons events
     std::set<std::string> gAceAddonBlacklist = {
@@ -85,6 +90,9 @@ namespace perf_monitor {
     // Track when we're drawing the world scene
     bool gIsDrawingWorldScene = false;
 
+    // Scene draw loop timing variables
+    std::chrono::high_resolution_clock::time_point gSceneDrawLoopStartTime;
+
     uint32_t GetTime() {
         return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now().time_since_epoch()).count()) - gStartTime;
@@ -95,11 +103,21 @@ namespace perf_monitor {
         return osGetAsyncTimeMs();
     }
 
-
     uintptr_t *GetLuaStatePtr() {
         typedef uintptr_t *(__fastcall *GETCONTEXT)(void);
-        static auto p_GetContext = reinterpret_cast<GETCONTEXT>(0x7040D0);
+        static auto p_GetContext = reinterpret_cast<GETCONTEXT>(Offsets::lua_getcontext);
         return p_GetContext();
+    }
+
+    // Helper function to get current Lua memory usage in KB
+    int GetLuaMemoryKB() {
+        auto const lua_getgccount = reinterpret_cast<lua_getgccountT>(Offsets::lua_getgccount);
+
+        uintptr_t *luaState = GetLuaStatePtr();
+        if (luaState != nullptr) {
+            return lua_getgccount(luaState);
+        }
+        return 0;
     }
 
 
@@ -578,13 +596,13 @@ namespace perf_monitor {
 
     // DrawParticle hook
     void DrawParticleHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx) {
-//        auto const DrawParticle = detour->GetTrampolineT<DrawParticleT>();
-//        auto start = std::chrono::high_resolution_clock::now();
-//        DrawParticle(this_ptr, dummy_edx);
-//        auto end = std::chrono::high_resolution_clock::now();
-//
-//        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-//        gDrawParticleStats.update(duration);
+        auto const DrawParticle = detour->GetTrampolineT<DrawParticleT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        DrawParticle(this_ptr, dummy_edx);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gDrawParticleStats.update(duration);
     }
 
     // DrawCallback hook
@@ -616,6 +634,39 @@ namespace perf_monitor {
             // Call original function without timing when not drawing world scene
             CM2SceneRenderDraw(this_ptr, dummy_edx, param_1, param_2, param_3, param_4);
         }
+    }
+
+    // luaC_collectgarbage hook
+    void luaC_collectgarbageHook(hadesmem::PatchDetourBase *detour, int param_1) {
+        auto const luaC_collectgarbage = detour->GetTrampolineT<luaC_collectgarbageT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        luaC_collectgarbage(param_1);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gLuaCCollectgarbageStats.update(duration);
+    }
+
+
+    void CM2ModelAnimateMTHook(hadesmem::PatchDetourBase *detour, uintptr_t *this_ptr, void *dummy_edx, float *param_1,
+                               float *param_2, float *param_3, float *param_4) {
+
+        auto const CM2ModelAnimateMT = detour->GetTrampolineT<CM2ModelAnimateMTT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        CM2ModelAnimateMT(this_ptr, dummy_edx, param_1, param_2, param_3, param_4);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gCM2ModelAnimateMTStats.update(duration);
+    }
+
+    void ObjectFreeHook(hadesmem::PatchDetourBase *detour, int param_1, uint32_t param_2) {
+        auto const ObjectFree = detour->GetTrampolineT<ObjectFreeT>();
+        auto start = std::chrono::high_resolution_clock::now();
+        ObjectFree(param_1, param_2);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        gObjectFreeStats.update(duration);
     }
 
 
@@ -712,9 +763,17 @@ namespace perf_monitor {
             if (addonName.empty()) {
                 FrameOnLayerUpdate(frame, unk, unk2);
             } else {
+                // Get memory before OnUpdate
+                int memoryBefore = GetLuaMemoryKB();
+
                 auto start = std::chrono::high_resolution_clock::now();
                 FrameOnLayerUpdate(frame, unk, unk2);
                 auto end = std::chrono::high_resolution_clock::now();
+
+                // Get memory after OnUpdate
+                int memoryAfter = GetLuaMemoryKB();
+                int memoryDelta = memoryAfter - memoryBefore;
+
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
                 // Update overall stats
@@ -725,6 +784,12 @@ namespace perf_monitor {
                     gAddonOnUpdateStats[addonName] = FunctionStats(addonName + " OnUpdate");
                 }
                 gAddonOnUpdateStats[addonName].update(duration);
+
+                // Update memory stats for OnUpdate
+                if (gAddonOnUpdateMemoryStats.find(addonName) == gAddonOnUpdateMemoryStats.end()) {
+                    gAddonOnUpdateMemoryStats[addonName] = MemoryStats(addonName + " OnUpdate Memory");
+                }
+                gAddonOnUpdateMemoryStats[addonName].update(memoryDelta);
             }
         }
     }
@@ -734,9 +799,16 @@ namespace perf_monitor {
         auto const FrameScriptObjectOnScriptEvent = detour->GetTrampolineT<FrameOnScriptEventT>();
         auto lastEventCode = gLastEventCode;
 
+        // Get memory before event
+        int memoryBefore = GetLuaMemoryKB();
+
         auto start = std::chrono::high_resolution_clock::now();
         FrameScriptObjectOnScriptEvent(param_1, param_2);
         auto end = std::chrono::high_resolution_clock::now();
+
+        // Get memory after event
+        int memoryAfter = GetLuaMemoryKB();
+        int memoryDelta = memoryAfter - memoryBefore;
 
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -755,6 +827,13 @@ namespace perf_monitor {
                 gAddonScriptEventStats[addonName].update(duration);
 
                 TrackEvent(addonName, lastEventCode, static_cast<double>(duration));
+
+                // Update memory stats for OnEvent
+                if (gAddonOnEventMemoryStats.find(addonName) == gAddonOnEventMemoryStats.end()) {
+                    gAddonOnEventMemoryStats[addonName] = MemoryStats(addonName + " OnEvent Memory");
+                }
+
+                gAddonOnEventMemoryStats[addonName].update(memoryDelta);
             }
         }
     }
@@ -772,11 +851,18 @@ namespace perf_monitor {
             return;
         }
 
+        // Get memory before event
+        int memoryBefore = GetLuaMemoryKB();
+
         auto start = std::chrono::high_resolution_clock::now();
         FrameOnScriptEventParam(framescriptObj, param_2, param_3, args);
         auto end = std::chrono::high_resolution_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Get memory after event
+        int memoryAfter = GetLuaMemoryKB();
+        int memoryDelta = memoryAfter - memoryBefore;
 
         // Update overall stats
         gFrameOnScriptEventStats.update(duration);
@@ -792,6 +878,13 @@ namespace perf_monitor {
                 gAddonScriptEventStats[addonName].update(duration);
 
                 TrackEvent(addonName, lastEventCode, static_cast<double>(duration));
+
+                // Update memory stats for OnEvent
+                if (gAddonOnEventMemoryStats.find(addonName) == gAddonOnEventMemoryStats.end()) {
+                    gAddonOnEventMemoryStats[addonName] = MemoryStats(addonName + " OnEvent Memory");
+                }
+
+                gAddonOnEventMemoryStats[addonName].update(memoryDelta);
             }
         }
     }
@@ -851,23 +944,23 @@ namespace perf_monitor {
     // Original SignalEventParam function pointer
     SignalEventParamT pOriginalSignalEventParam = nullptr;
     // Dynamic stack for return addresses to handle arbitrary nesting levels
-    void* signalEventParamReturnAddressStack[32]; // Fixed size array for inline assembly compatibility
+    void *signalEventParamReturnAddressStack[32]; // Fixed size array for inline assembly compatibility
     int signalEventParamStackTop = 0;
-    void* tempReturnAddress = nullptr; // Temporary storage for return address during register restoration
+    void *tempReturnAddress = nullptr; // Temporary storage for return address during register restoration
 
     // Helper functions for managing the return address stack
-    void PushReturnAddress(void* address) {
+    void PushReturnAddress(void *address) {
         if (signalEventParamStackTop < 32) {
             signalEventParamReturnAddressStack[signalEventParamStackTop++] = address;
         }
     }
 
-    void* PopReturnAddress() {
+    void *PopReturnAddress() {
         if (signalEventParamStackTop <= 0) {
             DEBUG_LOG("ERROR: Trying to pop from empty return address stack!");
             return nullptr;
         }
-        void* address = signalEventParamReturnAddressStack[--signalEventParamStackTop];
+        void *address = signalEventParamReturnAddressStack[--signalEventParamStackTop];
         return address;
     }
 
@@ -1005,8 +1098,8 @@ namespace perf_monitor {
         // Hook SpellVisualsTick
         initializeHook<StdcallT>(process, Offsets::SpellVisualsTick, &SpellVisualsTickHook);
 
-        // Hook PlaySpellVisual - DISABLED
-        initializeHook<PlaySpellVisualT>(process, Offsets::PlaySpellVisual, &PlaySpellVisualHook);
+        // Hook PlaySpellVisual - DISABLED wasn't super useful.  doesn't capture the true performance cost of some spells
+//        initializeHook<PlaySpellVisualT>(process, Offsets::PlaySpellVisual, &PlaySpellVisualHook);
 
         // Hook UnitUpdate
         initializeHook<FastcallFrameT>(process, Offsets::CGWorldFrameUnitUpdate, &UnitUpdateHook);
@@ -1037,6 +1130,11 @@ namespace perf_monitor {
         initializeHook<DrawParticleT>(process, Offsets::DrawParticle, &DrawParticleHook);
         initializeHook<DrawCallbackT>(process, Offsets::DrawCallback, &DrawCallbackHook);
         initializeHook<CM2SceneRenderDrawT>(process, Offsets::CM2SceneRenderDraw, &CM2SceneRenderDrawHook);
+        // Hook CM2ModelAnimateMT
+        initializeHook<CM2ModelAnimateMTT>(process, Offsets::CM2ModelAnimateMT, &CM2ModelAnimateMTHook);
+
+        // Hook ObjectFree
+        initializeHook<ObjectFreeT>(process, Offsets::ObjectFree, &ObjectFreeHook);
 
         // Hook ObjectUpdateHandler
         initializeHook<PacketHandlerT>(process, Offsets::ObjectUpdateHandler, &ObjectUpdateHandlerHook);
@@ -1080,6 +1178,9 @@ namespace perf_monitor {
 
         // Hook SignalEvent
         initializeHook<SignalEventT>(process, Offsets::SignalEvent, &SignalEventHook);
+
+        // Hook luaC_collectgarbage
+        initializeHook<luaC_collectgarbageT>(process, Offsets::luaC_collectgarbage, &luaC_collectgarbageHook);
 
         // Hook SignalEventParam using Microsoft Detours
         pOriginalSignalEventParam = reinterpret_cast<SignalEventParamT>(Offsets::SignalEventParam);

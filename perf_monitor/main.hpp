@@ -70,6 +70,9 @@ namespace perf_monitor {
     using lua_pushnilT = void (__fastcall *)(uintptr_t *);
     using lua_errorT = void (__cdecl *)(uintptr_t *, const char *);
     using lua_settopT = void (__fastcall *)(uintptr_t *, int);
+    using lua_getgccountT = int (__fastcall *)(uintptr_t *);
+    using lua_getgcthresholdT = int (__fastcall *)(uintptr_t *);
+    using lua_setgcthresholdT  = void (__fastcall *)(uintptr_t *, int newthreshold);
 
     using GxRsSetT = void (__fastcall *)(int renderState, int enabled);
 
@@ -102,6 +105,12 @@ namespace perf_monitor {
     using PacketHandlerT = int (__stdcall *)(uintptr_t *param_1, CDataStore *dataStore);
 
     using WorldObjectRenderT = int (__fastcall *)(int param_1, int* matrix, int param_3, int param_4, int param_5);
+
+    using luaC_collectgarbageT = void (__fastcall *)(int param_1);
+
+    using CM2ModelAnimateMTT = void (__fastcall *)(uintptr_t *this_ptr, void *dummy_edx, float *param_1, float *param_2, float *param_3, float *param_4);
+
+    using ObjectFreeT = void (__fastcall *)(int param_1, uint32_t param_2);
 
     inline bool IsValidAsciiString(const char* str, size_t maxLen = 256) {
         if (!str) return false;

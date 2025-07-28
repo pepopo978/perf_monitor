@@ -5,6 +5,9 @@
 #include <map>
 #include <vector>
 #include <chrono>
+#include <iomanip>
+#include <iostream>
+#include "logging.hpp"
 
 namespace perf_monitor {
     // Forward declarations
@@ -55,6 +58,49 @@ namespace perf_monitor {
         }
     };
 
+    // Structure to track memory usage for addons
+    struct MemoryStats {
+        std::string name;
+        long long totalMemoryIncrease = 0;  // Total memory increase in KB
+        long long maxMemoryIncrease = 0;    // Largest single memory increase in KB
+        size_t callCount = 0;               // Number of calls tracked
+        double avgMemoryIncrease = 0.0;     // Average memory increase per call in KB
+
+        MemoryStats() : name("Unknown") {}
+        MemoryStats(std::string addonName) : name(std::move(addonName)) {}
+
+        void update(int memoryDelta) {
+            if (memoryDelta > 0) {  // Only track increases
+                callCount++;
+                totalMemoryIncrease += memoryDelta;
+                if (memoryDelta > maxMemoryIncrease) {
+                    maxMemoryIncrease = memoryDelta;
+                }
+                avgMemoryIncrease = static_cast<double>(totalMemoryIncrease) / callCount;
+            }
+        }
+
+        void clearStats() {
+            totalMemoryIncrease = 0;
+            maxMemoryIncrease = 0;
+            callCount = 0;
+            avgMemoryIncrease = 0.0;
+        }
+
+        void outputStats() {
+            if (callCount > 0) {
+                DEBUG_LOG(
+                    std::fixed << std::setprecision(1)
+                               << "[" << std::left << std::setw(45) << name << "] "
+                               << "Calls: " << std::right << std::setw(6) << callCount
+                               << ", Total Mem: " << std::right << std::setw(8) << totalMemoryIncrease << " KB"
+                               << ", Avg: " << std::right << std::setw(6) << avgMemoryIncrease << " KB"
+                               << ", Max: " << std::right << std::setw(6) << maxMemoryIncrease << " KB"
+                );
+            }
+        }
+    };
+
     // Global statistics objects - extern declarations
     extern FunctionStats gRenderWorldStats;
     extern FunctionStats gOnWorldRenderStats;
@@ -91,10 +137,15 @@ namespace perf_monitor {
     extern FunctionStats gDrawCallbackStats;
     extern FunctionStats gCM2SceneRenderDrawStats;
     extern FunctionStats gTotalEventsStats;
+    extern FunctionStats gLuaCCollectgarbageStats;
+    extern FunctionStats gCM2ModelAnimateMTStats;
+    extern FunctionStats gObjectFreeStats;
 
     // Global maps and containers (not already declared in events.hpp)
     extern std::map<std::string, std::vector<EventStats>> gAddonEventStats;
     extern std::map<uint32_t, FunctionStats> gSpellVisualStatsById;
+    extern std::map<std::string, MemoryStats> gAddonOnEventMemoryStats;
+    extern std::map<std::string, MemoryStats> gAddonOnUpdateMemoryStats;
 
     // OutputStats function declaration
     void OutputStats(uint64_t startTime, uint64_t endTime);

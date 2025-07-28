@@ -85,6 +85,7 @@ enum class Offsets : std::uint32_t {
     WorldObjectRender = 0X006EB840,  // barely impacted performance
 
     RunningAddonName = 0X00CEEAC0,
+    RunningAddonName2 = 0X00CEEAC4,
 
     DrawBatchProj = 0x0070cb30,
     DrawBatch = 0x0070cf70,
@@ -100,5 +101,12 @@ enum class Offsets : std::uint32_t {
     EventUnregisterEx = 0X0041FD90,
     MovementIdleMoveUnits = 0X00616800,
 
-    GxRsSet = 0X00589E60
+    GxRsSet = 0X00589E60,
+
+    luaC_collectgarbage = 0X006F7340,
+    lua_getcontext = 0x007040D0,
+    lua_getgccount = 0x006f43f0,
+
+    CM2ModelAnimateMT = 0x00714260,
+    ObjectFree = 0X00463B00
 };

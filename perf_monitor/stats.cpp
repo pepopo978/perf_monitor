@@ -42,7 +42,10 @@ namespace perf_monitor {
     FunctionStats gDrawParticleStats("CM2SceneRender::DrawParticle");
     FunctionStats gDrawCallbackStats("CM2SceneRender::DrawCallback");
     FunctionStats gCM2SceneRenderDrawStats("CM2SceneRender::Draw");
-    
+    FunctionStats gCM2ModelAnimateMTStats("CM2Model::AnimateMT");
+    FunctionStats gLuaCCollectgarbageStats("Lua Garbage Collection");
+    FunctionStats gObjectFreeStats("World Object Garbage Collection");
+
     void FunctionStats::update(long long duration) {
         double d = static_cast<double>(duration);
         // Update stats
@@ -448,11 +451,11 @@ namespace perf_monitor {
             // Now add remaining stats to be sorted at top level
             allStats.clear();
 
-            ss.str("");
-            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "PlaySpellVisual:"
-               << std::right << std::setw(6) << playSpellVisualPercent << "% ("
-               << std::right << std::setw(8) << totalPlaySpellVisualMs << " ms)";
-            allStats.emplace_back(playSpellVisualPercent, ss.str());
+//            ss.str("");
+//            ss << std::fixed << std::setprecision(2) << std::left << std::setw(25) << "PlaySpellVisual:"
+//               << std::right << std::setw(6) << playSpellVisualPercent << "% ("
+//               << std::right << std::setw(8) << totalPlaySpellVisualMs << " ms)";
+//            allStats.emplace_back(playSpellVisualPercent, ss.str());
 
             // Frame stats
             ss.str("");
@@ -495,6 +498,7 @@ namespace perf_monitor {
         gUnknownOnRender3Stats.outputStats();
         gCM2SceneAdvanceTimeStats.outputStats();
         gCM2SceneAnimateStats.outputStats();
+        gCM2ModelAnimateMTStats.outputStats();
         gCM2SceneDrawStats.outputStats();
         gDrawBatchProjStats.outputStats();
         gDrawBatchStats.outputStats();
@@ -511,22 +515,25 @@ namespace perf_monitor {
 
         NEWLINE_LOG();
         gObjectUpdateHandlerStats.outputStats();
-        gPlaySpellVisualStats.outputStats();
-
+//        gPlaySpellVisualStats.outputStats();
         gFrameOnScriptEventStats.outputStats();
         gFrameOnLayerUpdateStats.outputStats();
+        NEWLINE_LOG();
+
+        gLuaCCollectgarbageStats.outputStats();
+        gObjectFreeStats.outputStats();
 
         NEWLINE_LOG();
 
         // --- ADDON ONUPDATE PERFORMANCE ---
         if (!gAddonOnUpdateStats.empty()) {
-            DEBUG_LOG("--- ADDON/FRAME ONUPDATE PERFORMANCE (min .1ms total)---");
+            DEBUG_LOG("--- ADDON/FRAME ONUPDATE PERFORMANCE (min 1ms total)---");
 
             // Sort addons by total time
             std::vector<std::pair<double, std::string>> addonOnUpdateStats;
             for (auto it = gAddonOnUpdateStats.begin();
                  it != gAddonOnUpdateStats.end(); ++it) {
-                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
+                if (it->second.callCount > 0 && it->second.totalTime >= 1000.0) {
                     addonOnUpdateStats.push_back(std::make_pair(it->second.totalTime, it->first));
                 }
             }
@@ -538,15 +545,55 @@ namespace perf_monitor {
             }
         }
 
+        // --- ADDON ONUPDATE MEMORY USAGE ---
+        if (!gAddonOnUpdateMemoryStats.empty()) {
+            DEBUG_LOG("--- ADDON ONUPDATE MEMORY USAGE (min 1KB total increase) ---");
+
+            // Sort addons by total memory increase
+            std::vector<std::pair<long long, std::string>> addonMemoryStats;
+            for (auto it = gAddonOnUpdateMemoryStats.begin();
+                 it != gAddonOnUpdateMemoryStats.end(); ++it) {
+                if (it->second.callCount > 0 && it->second.totalMemoryIncrease >= 1) {
+                    addonMemoryStats.push_back(std::make_pair(it->second.totalMemoryIncrease, it->first));
+                }
+            }
+            std::sort(addonMemoryStats.rbegin(), addonMemoryStats.rend());
+
+            for (auto it = addonMemoryStats.begin();
+                 it != addonMemoryStats.end(); ++it) {
+                gAddonOnUpdateMemoryStats[it->second].outputStats();
+            }
+        }
+
+        // --- ADDON ONEVENT MEMORY USAGE ---
+        if (!gAddonOnEventMemoryStats.empty()) {
+            DEBUG_LOG("--- ADDON ONEVENT MEMORY USAGE (min 1KB total increase) ---");
+
+            // Sort addons by total memory increase
+            std::vector<std::pair<long long, std::string>> addonEventMemoryStats;
+            for (auto it = gAddonOnEventMemoryStats.begin();
+                 it != gAddonOnEventMemoryStats.end(); ++it) {
+                if (it->second.callCount > 0 && it->second.totalMemoryIncrease >= 1) {
+                    addonEventMemoryStats.push_back(std::make_pair(it->second.totalMemoryIncrease, it->first));
+                }
+            }
+            std::sort(addonEventMemoryStats.rbegin(), addonEventMemoryStats.rend());
+
+            for (auto it = addonEventMemoryStats.begin();
+                 it != addonEventMemoryStats.end(); ++it) {
+                gAddonOnEventMemoryStats[it->second].outputStats();
+            }
+        }
+
         // --- ADDON EVENT STATS ---
         if (!gAddonScriptEventStats.empty()) {
-            DEBUG_LOG("--- ADDON/FRAME EVENTS PERFORMANCE (min .1ms total)---");
+            DEBUG_LOG("--- ADDON/FRAME EVENTS PERFORMANCE (min 1ms total)---");
 
             // Sort addons by total time
             std::vector<std::pair<double, std::string>> addonStats;
             for (auto it = gAddonScriptEventStats.begin();
                  it != gAddonScriptEventStats.end(); ++it) {
-                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
+                if (it->second.callCount > 0 && it->second.totalTime >= 1000.0) {
                     addonStats.push_back(std::make_pair(it->second.totalTime, it->first));
                 }
             }
@@ -560,7 +607,7 @@ namespace perf_monitor {
 
         // --- ADDON SLOWEST EVENTS REPORT ---
         if (!gAddonEventStats.empty()) {
-            DEBUG_LOG("--- ADDON/FRAME SLOWEST EVENTS REPORT (min .1ms combined duration) ---");
+            DEBUG_LOG("--- ADDON/FRAME SLOWEST EVENTS REPORT (min 1ms combined duration) ---");
 
             for (const auto &addonPair: gAddonEventStats) {
                 const std::string &addonName = addonPair.first;
@@ -573,8 +620,8 @@ namespace perf_monitor {
                         totalAddonDuration += event.duration;
                     }
 
-                    // Skip if total duration is less than 0.1ms (100 microseconds)
-                    if (totalAddonDuration < 100.0) {
+                    // Skip if total duration is less than 1ms (1000 microseconds)
+                    if (totalAddonDuration < 1000.0) {
                         continue;
                     }
 
@@ -599,14 +646,15 @@ namespace perf_monitor {
             }
         }
 
+
         // --- SPELL VISUAL PERFORMANCE (TOP 10 SLOWEST) ---
         if (!gSpellVisualStatsById.empty()) {
-            DEBUG_LOG("--- SPELL VISUAL PERFORMANCE (min .1ms total) ---");
+            DEBUG_LOG("--- SPELL VISUAL PERFORMANCE (min 1ms total) ---");
 
             // Sort spells by total time
             std::vector<std::pair<double, uint32_t>> spellStats;
             for (auto it = gSpellVisualStatsById.begin(); it != gSpellVisualStatsById.end(); ++it) {
-                if (it->second.callCount > 0 && it->second.totalTime >= 100.0) {
+                if (it->second.callCount > 0 && it->second.totalTime >= 1000.0) {
                     spellStats.push_back(std::make_pair(it->second.totalTime, it->first));
                 }
             }
@@ -674,6 +722,9 @@ namespace perf_monitor {
         gDrawCallbackStats.clearStats();
         gCM2SceneRenderDrawStats.clearStats();
         gFrameOnLayerUpdateStats.clearStats();
+        gLuaCCollectgarbageStats.clearStats();
+        gCM2ModelAnimateMTStats.clearStats();
+        gObjectFreeStats.clearStats();
 
         // Clear addon stats
         for (auto it = gAddonScriptEventStats.begin();
@@ -686,6 +737,18 @@ namespace perf_monitor {
              it != gAddonOnUpdateStats.end(); ++it) {
             it->second.clearStats();
         }
+
+        // Clear addon memory stats
+        for (auto it = gAddonOnUpdateMemoryStats.begin();
+             it != gAddonOnUpdateMemoryStats.end(); ++it) {
+            it->second.clearStats();
+        }
+
+        for (auto it = gAddonOnEventMemoryStats.begin();
+             it != gAddonOnEventMemoryStats.end(); ++it) {
+            it->second.clearStats();
+        }
+
 
         // Clear addon event stats
         gAddonEventStats.clear();
